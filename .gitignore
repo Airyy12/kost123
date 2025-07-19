@@ -1,1 +1,8 @@
+# Ignore credential dan secrets
+credentials.json
+.streamlit/secrets.toml
+
+# Ignore file sistem lokal
+__pycache__/
+*.pyc
 
