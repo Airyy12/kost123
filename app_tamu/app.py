@@ -1,42 +1,46 @@
 import streamlit as st
+import sys
+import os
+sys.path.append(os.path.abspath(".."))  # agar bisa impor sheets.py dan drive.py
+
 from sheets import get_kamar_data, tambah_booking
-import datetime
 
 st.set_page_config(page_title="Kost Online - Tamu", layout="wide")
-st.title("Selamat Datang di Kost Online!")
 
-tab1, tab2 = st.tabs(["💺 Lihat Kamar", "📝 Booking Kamar"])
-with tab1:
-    kamar_data = get_kamar_data()
-    if kamar_data:
-        for kamar in kamar_data:
-            st.subheader(f"Kamar {kamar['Nomor']}")
-            st.write(f"✅ Tipe: {kamar['Tipe']}")
-            st.write(f"💵 Harga: Rp{kamar['Harga']}/bulan")
-            st.write(f"📌 Status: {kamar['Status']}")
+st.title("🏡 Daftar Kamar Kos")
+
+# Ambil data kamar dari Google Sheets
+kamar_data = get_kamar_data()
+
+if not kamar_data:
+    st.warning("Belum ada data kamar yang tersedia.")
+else:
+    for kamar in kamar_data:
+        nama_kamar = kamar.get("nama", "Kamar Tanpa Nama")
+        harga = kamar.get("harga", "Tidak ada harga")
+        deskripsi = kamar.get("deskripsi", "")
+        foto_url = kamar.get("foto_url", "")
+
+        with st.container():
+            st.subheader(nama_kamar)
+            if foto_url:
+                st.image(foto_url, width=300)
+            st.write(f"💰 Harga: {harga}")
+            st.write(f"📝 {deskripsi}")
             st.markdown("---")
-    else:
-        st.info("Belum ada data kamar tersedia.")
-with tab2:
-    st.subheader("Form Booking")
+
+    st.header("📋 Form Booking Kamar")
 
     nama = st.text_input("Nama Lengkap")
-    kontak = st.text_input("Kontak (HP/WA)")
-    no_kamar = st.selectbox("Pilih Nomor Kamar", [k['Nomor'] for k in kamar_data if k['Status'].lower() == "kosong"])
-    tanggal_masuk = st.date_input("Tanggal Masuk", datetime.date.today())
+    no_hp = st.text_input("No. HP")
+    pilih_kamar = st.selectbox("Pilih Kamar", [k["nama"] for k in kamar_data])
 
     if st.button("Kirim Booking"):
-        if nama and kontak and no_kamar:
-            tambah_booking(nama, kontak, no_kamar, tanggal_masuk)
-            st.success("Booking berhasil dikirim!")
+        if not nama or not no_hp or not pilih_kamar:
+            st.error("Mohon lengkapi semua kolom.")
         else:
-            st.warning("Mohon lengkapi semua isian.")
-def get_kamar_data():
-    sheet = connect_gsheet()
-    kamar_ws = sheet.worksheet("kamar")
-    records = kamar_ws.get_all_records()
-    return records
-def tambah_booking(nama, kontak, no_kamar, tanggal_masuk):
-    sheet = connect_gsheet()
-    booking_ws = sheet.worksheet("booking")
-    booking_ws.append_row([nama, kontak, no_kamar, str(tanggal_masuk), "pending"])
+            # Tambahkan ke Google Sheets
+            tambah_booking(nama, no_hp, pilih_kamar)
+
+            st.success("Booking berhasil dikirim!")
+            st.balloons()
