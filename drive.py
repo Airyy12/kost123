@@ -14,7 +14,7 @@ def upload_to_drive(file, filename, mimetype="image/jpeg"):
     media = MediaIoBaseUpload(io.BytesIO(file.read()), mimetype=mimetype)
     file_metadata = {
         "name": filename,
-        "parents": [st.secrets["gdrive_folder_id"]],
+        "parents": [st.secrets["drive_folder_id"]],
     }
 
     uploaded = service.files().create(
