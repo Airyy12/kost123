@@ -28,7 +28,7 @@ def registrasi_admin():
             user_ws = connect_gsheet().worksheet("User")
             user_ws.append_row([username, hashed, "admin"])
             st.success("Admin berhasil dibuat. Silakan login.")
-            st.rerun()
+            st.experimental_rerun()
 
 def login(username, password):
     sheet = connect_gsheet().worksheet("User")
@@ -52,10 +52,10 @@ def kelola_kamar():
             st.write(f"**{k['Nama']}** - {k['Status']} - Rp{k['Harga']}")
             st.text(k['Deskripsi'])
         with col2:
-            if st.button(f"Hapus {k['Nama']}", key=idx):
+            if st.button(f"Hapus {k['Nama']}", key=f"hapus_{idx}"):
                 kamar_ws.delete_rows(idx+2)
                 st.success(f"Kamar {k['Nama']} dihapus.")
-                st.rerun()
+                st.experimental_rerun()
 
     st.markdown("---")
     st.subheader("➕ Tambah Kamar Baru")
@@ -68,7 +68,7 @@ def kelola_kamar():
         link_foto = upload_to_drive(foto, f"{safe_nama}.jpg") if foto else ""
         kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link_foto])
         st.success("Kamar berhasil ditambahkan.")
-        st.rerun()
+        st.experimental_rerun()
 
 def verifikasi_booking():
     st.subheader("📄 Verifikasi Booking")
@@ -95,7 +95,7 @@ def verifikasi_booking():
 
             booking_ws.delete_rows(idx+2)
             st.success(f"{b['nama']} disetujui. Password default: {password}")
-            st.rerun()
+            st.experimental_rerun()
 
 # ---------- Fitur Penyewa ----------
 
@@ -119,26 +119,48 @@ def fitur_penyewa(username):
             komplain_ws.append_row([username, isi, str(datetime.now())])
             st.success("Komplain berhasil dikirim.")
 
-# ---------- Main App ----------
+# ---------- Session State Handling ----------
 
 st.set_page_config(page_title="Dashboard Kost123", layout="wide")
 st.title("📊 Dashboard Kost123")
 
+if "login_status" not in st.session_state:
+    st.session_state.login_status = False
+    st.session_state.role = None
+    st.session_state.username = ""
+
+# ---------- Main App ----------
+
 if not cek_admin():
     registrasi_admin()
 else:
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        role = login(username, password)
-        if role == "admin":
-            st.sidebar.success("Login sebagai Admin")
+    if not st.session_state.login_status:
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            role = login(username, password)
+            if role:
+                st.session_state.login_status = True
+                st.session_state.role = role
+                st.session_state.username = username
+                st.experimental_rerun()
+            else:
+                st.error("Username atau Password salah.")
+    else:
+        st.sidebar.success(f"Login sebagai {st.session_state.role.capitalize()}")
+
+        if st.session_state.role == "admin":
             menu = st.sidebar.selectbox("Menu Admin", ["Kelola Kamar", "Verifikasi Booking"])
             if menu == "Kelola Kamar":
                 kelola_kamar()
             elif menu == "Verifikasi Booking":
                 verifikasi_booking()
-        elif role == "penyewa":
-            fitur_penyewa(username)
-        else:
-            st.error("Username atau Password salah.")
+        elif st.session_state.role == "penyewa":
+            fitur_penyewa(st.session_state.username)
+
+        # Tombol Logout
+        if st.sidebar.button("Logout"):
+            st.session_state.login_status = False
+            st.session_state.role = None
+            st.session_state.username = ""
+            st.experimental_rerun()
