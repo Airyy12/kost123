@@ -1,3 +1,5 @@
+# Abaikan kredensial dan file lokal
 .streamlit/secrets.toml
-credentials.json
-mycreds.txt
+__pycache__/
+*.pyc
+.env
