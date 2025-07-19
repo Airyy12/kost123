@@ -1,46 +1,19 @@
 import streamlit as st
-import sys
-import os
-sys.path.append(os.path.abspath(".."))  # agar bisa impor sheets.py dan drive.py
+from sheets import get_data, add_booking
+from drive import upload_file
 
-from sheets import get_kamar_data, tambah_booking
-
-st.set_page_config(page_title="Kost Online - Tamu", layout="wide")
-
-st.title("🏡 Daftar Kamar Kos")
+st.title("Kost Putri Aman & Nyaman")
 
 # Ambil data kamar dari Google Sheets
-kamar_data = get_kamar_data()
+kamar = get_data(sheet_name="Kamar")
 
-if not kamar_data:
-    st.warning("Belum ada data kamar yang tersedia.")
-else:
-    for kamar in kamar_data:
-        nama_kamar = kamar.get("nama", "Kamar Tanpa Nama")
-        harga = kamar.get("harga", "Tidak ada harga")
-        deskripsi = kamar.get("deskripsi", "")
-        foto_url = kamar.get("foto_url", "")
+for k in kamar:
+    st.subheader(k["nama"])
+    st.image(k["foto_url"])
+    st.write(f"Harga: {k['harga']}/bulan")
+    st.write(k["deskripsi"])
+    if st.button(f"Booking {k['nama']}", key=k["nama"]):
+        st.session_state['kamar_dipilih'] = k["nama"]
+        st.switch_page("booking")
 
-        with st.container():
-            st.subheader(nama_kamar)
-            if foto_url:
-                st.image(foto_url, width=300)
-            st.write(f"💰 Harga: {harga}")
-            st.write(f"📝 {deskripsi}")
-            st.markdown("---")
-
-    st.header("📋 Form Booking Kamar")
-
-    nama = st.text_input("Nama Lengkap")
-    no_hp = st.text_input("No. HP")
-    pilih_kamar = st.selectbox("Pilih Kamar", [k["nama"] for k in kamar_data])
-
-    if st.button("Kirim Booking"):
-        if not nama or not no_hp or not pilih_kamar:
-            st.error("Mohon lengkapi semua kolom.")
-        else:
-            # Tambahkan ke Google Sheets
-            tambah_booking(nama, no_hp, pilih_kamar)
-
-            st.success("Booking berhasil dikirim!")
-            st.balloons()
+# Form booking nanti ditaruh di halaman/form booking tersendiri
