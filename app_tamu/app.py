@@ -1,32 +1,42 @@
 import streamlit as st
-from sheets import get_kamar_list, simpan_booking
-from drive import upload_file_to_drive
-from datetime import datetime
+from sheets import get_kamar_data, tambah_booking
+import datetime
 
-st.set_page_config(page_title="Kost Online", layout="wide")
-st.title("🏠 Daftar Kamar Kost")
+st.set_page_config(page_title="Kost Online - Tamu", layout="wide")
+st.title("Selamat Datang di Kost Online!")
 
-# Ambil data kamar dari Google Sheets
-kamar_list = get_kamar_list()
+tab1, tab2 = st.tabs(["💺 Lihat Kamar", "📝 Booking Kamar"])
+with tab1:
+    kamar_data = get_kamar_data()
+    if kamar_data:
+        for kamar in kamar_data:
+            st.subheader(f"Kamar {kamar['Nomor']}")
+            st.write(f"✅ Tipe: {kamar['Tipe']}")
+            st.write(f"💵 Harga: Rp{kamar['Harga']}/bulan")
+            st.write(f"📌 Status: {kamar['Status']}")
+            st.markdown("---")
+    else:
+        st.info("Belum ada data kamar tersedia.")
+with tab2:
+    st.subheader("Form Booking")
 
-for kamar in kamar_list:
-    with st.expander(f"{kamar['nama']} - {kamar['harga']}"):
-        st.image(kamar.get("gambar_url", ""), width=300)
-        st.markdown(f"**Fasilitas:** {kamar['fasilitas']}")
-        st.markdown(f"**Status:** {kamar['status']}")
+    nama = st.text_input("Nama Lengkap")
+    kontak = st.text_input("Kontak (HP/WA)")
+    no_kamar = st.selectbox("Pilih Nomor Kamar", [k['Nomor'] for k in kamar_data if k['Status'].lower() == "kosong"])
+    tanggal_masuk = st.date_input("Tanggal Masuk", datetime.date.today())
 
-        if kamar['status'].lower() == "kosong":
-            with st.form(key=f"form_booking_{kamar['nama']}"):
-                st.subheader("Booking Kamar Ini")
-                nama = st.text_input("Nama Lengkap")
-                no_hp = st.text_input("No HP / WA")
-                ktp_file = st.file_uploader("Upload Foto KTP", type=["jpg", "jpeg", "png"])
-
-                submit = st.form_submit_button("Kirim Booking")
-                if submit:
-                    if nama and no_hp and ktp_file:
-                        file_url = upload_file_to_drive(ktp_file, folder="ktp")
-                        simpan_booking(nama, no_hp, kamar['nama'], file_url)
-                        st.success("Booking berhasil dikirim! Admin akan segera menghubungi Anda.")
-                    else:
-                        st.warning("Mohon lengkapi semua data.")
+    if st.button("Kirim Booking"):
+        if nama and kontak and no_kamar:
+            tambah_booking(nama, kontak, no_kamar, tanggal_masuk)
+            st.success("Booking berhasil dikirim!")
+        else:
+            st.warning("Mohon lengkapi semua isian.")
+def get_kamar_data():
+    sheet = connect_gsheet()
+    kamar_ws = sheet.worksheet("kamar")
+    records = kamar_ws.get_all_records()
+    return records
+def tambah_booking(nama, kontak, no_kamar, tanggal_masuk):
+    sheet = connect_gsheet()
+    booking_ws = sheet.worksheet("booking")
+    booking_ws.append_row([nama, kontak, no_kamar, str(tanggal_masuk), "pending"])
