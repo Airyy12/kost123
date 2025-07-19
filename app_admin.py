@@ -28,7 +28,7 @@ def registrasi_admin():
             user_ws = connect_gsheet().worksheet("User")
             user_ws.append_row([username, hashed, "admin"])
             st.success("Admin berhasil dibuat. Silakan login.")
-            st.experimental_rerun()
+            st.rerun()
 
 def login(username, password):
     sheet = connect_gsheet().worksheet("User")
@@ -55,7 +55,7 @@ def kelola_kamar():
             if st.button(f"Hapus {k['Nama']}", key=f"hapus_{idx}"):
                 kamar_ws.delete_rows(idx+2)
                 st.success(f"Kamar {k['Nama']} dihapus.")
-                st.experimental_rerun()
+                st.rerun()
 
     st.markdown("---")
     st.subheader("➕ Tambah Kamar Baru")
@@ -68,7 +68,7 @@ def kelola_kamar():
         link_foto = upload_to_drive(foto, f"{safe_nama}.jpg") if foto else ""
         kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link_foto])
         st.success("Kamar berhasil ditambahkan.")
-        st.experimental_rerun()
+        st.rerun()
 
 def verifikasi_booking():
     st.subheader("📄 Verifikasi Booking")
@@ -95,7 +95,7 @@ def verifikasi_booking():
 
             booking_ws.delete_rows(idx+2)
             st.success(f"{b['nama']} disetujui. Password default: {password}")
-            st.experimental_rerun()
+            st.rerun()
 
 # ---------- Fitur Penyewa ----------
 
@@ -143,7 +143,7 @@ else:
                 st.session_state.login_status = True
                 st.session_state.role = role
                 st.session_state.username = username
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Username atau Password salah.")
     else:
@@ -163,4 +163,4 @@ else:
             st.session_state.login_status = False
             st.session_state.role = None
             st.session_state.username = ""
-            st.experimental_rerun()
+            st.rerun()
