@@ -1,13 +1,25 @@
-import gspread
 import streamlit as st
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+from oauth2client.service_account import ServiceAccountCredentials
+import json
 
-gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-sh = gc.open("kost-db")
+def get_drive():
+    credentials_dict = json.loads(st.secrets["gcp_service_account"])
+    scope = ["https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+    
+    gauth = GoogleAuth()
+    gauth.credentials = creds
+    return GoogleDrive(gauth)
 
-def get_data(sheet_name="Kamar"):
-    worksheet = sh.worksheet(sheet_name)
-    return worksheet.get_all_records()
-
-def add_booking(nama, nohp, kamar, link_ktp):
-    worksheet = sh.worksheet("Booking")
-    worksheet.append_row([nama, nohp, kamar, link_ktp])
+def upload_file_to_drive(file, filename):
+    drive = get_drive()
+    folder_id = st.secrets["gdrive_folder_id"]
+    gfile = drive.CreateFile({
+        'parents': [{'id': folder_id}],
+        'title': filename
+    })
+    gfile.SetContentFile(file)
+    gfile.Upload()
+    return gfile['id']
