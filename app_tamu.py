@@ -1,19 +1,37 @@
 import streamlit as st
-from sheets import get_data, add_booking
-from drive import upload_file
+from sheets import connect_gsheet
+from drive import upload_to_drive
 
-st.title("Kost Putri Aman & Nyaman")
+st.title("🏠 Kost Kami – Info & Booking")
 
-# Ambil data kamar dari Google Sheets
-kamar = get_data(sheet_name="Kamar")
+sheet = connect_gsheet()
+sheet_kamar = sheet.worksheet("Kamar")
+sheet_booking = sheet.worksheet("Booking")
 
-for k in kamar:
-    st.subheader(k["nama"])
-    st.image(k["foto_url"])
-    st.write(f"Harga: {k['harga']}/bulan")
-    st.write(k["deskripsi"])
-    if st.button(f"Booking {k['nama']}", key=k["nama"]):
-        st.session_state['kamar_dipilih'] = k["nama"]
-        st.switch_page("booking")
+data_kamar = sheet_kamar.get_all_records()
 
-# Form booking nanti ditaruh di halaman/form booking tersendiri
+# --- Tampilkan kamar ---
+st.subheader("Daftar Kamar Tersedia")
+for kamar in data_kamar:
+    if kamar['Status'] == 'Kosong':
+        st.markdown(f"**Kamar {kamar['Nama']}** - Rp{kamar['Harga']}/bulan")
+        st.image(kamar['Foto'], width=300)
+        st.text(f"{kamar['Deskripsi']}")
+        st.markdown("---")
+
+# --- Form Booking ---
+st.subheader("Booking Kamar")
+with st.form("booking_form"):
+    nama = st.text_input("Nama Lengkap")
+    nohp = st.text_input("No HP")
+    kamar_dipilih = st.selectbox("Pilih Kamar", [k["Nama"] for k in data_kamar if k["Status"] == "Kosong"])
+    foto_ktp = st.file_uploader("Upload Foto KTP", type=["jpg", "jpeg", "png"])
+    submitted = st.form_submit_button("Kirim Booking")
+
+    if submitted:
+        if foto_ktp:
+            link_foto = upload_to_drive(foto_ktp, f"KTP_{nama}.jpg")
+            sheet_booking.append_row([nama, nohp, kamar_dipilih, link_foto])
+            st.success("Booking berhasil dikirim!")
+        else:
+            st.warning("Harap upload KTP.")
