@@ -1,36 +1,23 @@
 import streamlit as st
-from supabase import create_client
-import os
+from sheets import connect_gsheet
 
-# Koneksi ke Supabase
-@st.cache_resource
-def init_db():
-    supabase_url = st.secrets["SUPABASE_URL"]
-    supabase_key = st.secrets["SUPABASE_KEY"]
-    return create_client(supabase_url, supabase_key)
+st.title("Aplikasi Manajemen Kost")
 
-db = init_db()
-
-# Tampilan
-st.title("🏠 Aplikasi Manajemen Kost")
-
-tab1, tab2 = st.tabs(["Daftar Kamar", "Tambah Penyewa"])
-
-with tab1:
-    st.write("### Kamar Tersedia")
-    data = db.table("kamar").select("*").eq("status", "tersedia").execute()
-    st.dataframe(data.data)
-
-with tab2:
-    with st.form("form_penyewa"):
-        nama = st.text_input("Nama Penyewa")
-        no_hp = st.text_input("No HP")
-        kamar = st.selectbox("Pilih Kamar", ["A101", "B202", "C303"])
-        
-        if st.form_submit_button("Simpan"):
-            db.table("penyewa").insert({
-                "nama": nama,
-                "no_hp": no_hp,
-                "kamar": kamar
-            }).execute()
-            st.success("Data tersimpan!")
+# Login sederhana (sementara)
+email = st.text_input("Masukkan email")
+if st.button("Login"):
+    sheet = connect_gsheet()
+    users_sheet = sheet.worksheet("users")
+    users = users_sheet.get_all_records()
+    user = next((u for u in users if u["email"] == email), None)
+    
+    if user:
+        st.success(f"Halo, {user['nama']}! Role Anda: {user['role']}")
+        if user['role'] == "admin":
+            st.subheader("Dashboard Admin")
+            # Tambahkan fitur admin di sini
+        elif user['role'] == "penyewa":
+            st.subheader("Dashboard Penyewa")
+            # Tambahkan fitur penyewa di sini
+    else:
+        st.error("Email tidak ditemukan.")
