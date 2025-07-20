@@ -589,3 +589,6 @@ def profil_saya():
     
     except Exception as e:
         st.error(f"Terjadi kesalahan: {str(e)}")
+
+def run_admin(menu):
+    jalankan_admin(menu)
