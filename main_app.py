@@ -74,7 +74,7 @@ def login_page():
                 st.session_state.role = u['role']
                 # Set menu awal saat login
                 st.session_state.menu = "Dashboard Admin" if u['role'] == 'admin' else "Dashboard"
-                st.experimental_rerun()
+                st.rerun()
         st.error("Username atau Password salah.")
 
 # ---------- Routing ----------
