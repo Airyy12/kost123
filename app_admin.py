@@ -24,10 +24,11 @@ def run_admin(menu):
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
 
-    kamar_ws = connect_gsheet().worksheet("Kamar")
-    user_ws = connect_gsheet().worksheet("User")
-    pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
-    komplain_ws = connect_gsheet().worksheet("Komplain")
+    sheet = connect_gsheet()
+    kamar_ws = sheet.worksheet("Kamar")
+    user_ws = sheet.worksheet("User")
+    pembayaran_ws = sheet.worksheet("Pembayaran")
+    komplain_ws = sheet.worksheet("Komplain")
 
     kamar_data = kamar_ws.get_all_records()
     user_data = user_ws.get_all_records()
@@ -38,7 +39,7 @@ def admin_dashboard():
     kamar_terisi = sum(1 for k in kamar_data if k['Status'].lower() == 'terisi')
     kamar_kosong = total_kamar - kamar_terisi
     penyewa = sum(1 for u in user_data if u['role'] == 'penyewa')
-    total_pemasukan = sum(int(p.get('nominal', 0)) for p in pembayaran_data if p.get('nominal', '').isdigit())
+    total_pemasukan = sum(int(p.get('nominal', 0)) for p in pembayaran_data if str(p.get('nominal', '')).isdigit())
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Kamar", total_kamar)
@@ -160,7 +161,7 @@ def manajemen_pembayaran():
         username = p.get('username', '-')
         bulan = p.get('bulan', '-')
         tahun = p.get('tahun', '-')
-        nominal = p.get('nominal', '-')
+        nominal = p.get('nominal', '0')
         waktu = p.get('waktu', '-')
         bukti_link = p.get('bukti', '')
 
@@ -189,3 +190,11 @@ def manajemen_pembayaran():
                     pembayaran_ws.delete_rows(idx+2)
                     st.warning(f"Pembayaran dari {username} telah ditolak.")
                     st.experimental_rerun()
+
+def verifikasi_booking():
+    st.title("✅ Verifikasi Booking")
+    st.info("Fitur ini sedang dalam pengembangan.")
+
+def profil_saya():
+    st.title("👤 Profil Saya")
+    st.info("Fitur ini sedang dalam pengembangan.")
