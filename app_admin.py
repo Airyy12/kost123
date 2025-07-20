@@ -67,7 +67,11 @@ def admin_dashboard():
 
     if komplain_data:
         df_komplain = pd.DataFrame(komplain_data)
-        df_komplain['bulan'] = pd.to_datetime(df_komplain['waktu']).dt.strftime('%B %Y')
+
+        # Tangani parsing tanggal yang error
+        df_komplain['waktu_parsed'] = pd.to_datetime(df_komplain['waktu'], errors='coerce')
+        df_komplain = df_komplain.dropna(subset=['waktu_parsed'])  # buang yang gagal diparse
+        df_komplain['bulan'] = df_komplain['waktu_parsed'].dt.strftime('%B %Y')
 
         komplain_per_bulan = df_komplain['bulan'].value_counts().sort_index()
         fig = px.bar(
