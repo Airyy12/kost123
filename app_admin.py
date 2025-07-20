@@ -640,139 +640,305 @@ def manajemen_komplain():
         st.error(f"Terjadi kesalahan: {str(e)}")
 
 def verifikasi_booking():
-    st.title("✅ Verifikasi Booking")
-
-    booking_ws = connect_gsheet().worksheet("Booking")
-    user_ws = connect_gsheet().worksheet("User")
-    kamar_ws = connect_gsheet().worksheet("Kamar")
-
-    bookings = booking_ws.get_all_records()
-    kamar_data = kamar_ws.get_all_records()
-
-    for idx, b in enumerate(bookings):
-        with st.expander(f"{b['nama']} - {b['kamar_dipilih']}"):
-            st.write(f"**Nama:** {b['nama']}")
-            st.write(f"**Kamar Dipilih:** {b['kamar_dipilih']}")
-            st.write(f"**Kontak:** {b.get('no_hp_email', '-')}")
-            st.write(f"**Waktu Booking:** {b.get('waktu_booking', '-')}")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
-                    # Buat akun user baru
-                    password = "12345678"
-                    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-                    
-                    # Format data sesuai struktur sheet User
-                    new_user = [
-                        b['nama'],           # username
-                        hashed,               # password_hash
-                        "penyewa",            # role
-                        b['nama'],            # nama_lengkap
-                        b.get('no_hp_email', ''),  # no_hp
-                        b['kamar_dipilih'],   # kamar
-                        "",                   # deskripsi
-                        "",                   # foto_profil
-                        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # last_edit
-                        "Belum Bayar"         # status_pembayaran
-                    ]
-                    
-                    user_ws.append_row(new_user)
-                    
-                    # Update status kamar
-                    for i, k in enumerate(kamar_data):
-                        if k['Nama'] == b['kamar_dipilih']:
-                            kamar_ws.update_cell(i+2, 2, "Terisi")
-                    
-                    # Hapus dari daftar booking
-                    booking_ws.delete_rows(idx+2)
-                    
-                    st.success(f"{b['nama']} disetujui dengan password default 12345678.")
-                    st.rerun()
-            
-            with col2:
-                if st.button(f"Tolak {b['nama']}", key=f"tolak_{idx}"):
-                    booking_ws.delete_rows(idx+2)
-                    st.warning(f"Booking dari {b['nama']} ditolak.")
-                    st.rerun()
-
-def profil_saya():
-    if 'profil_submenu' not in st.session_state:
-        st.session_state.profil_submenu = None
-
-    user_ws = connect_gsheet().worksheet("User")
-    users = user_ws.get_all_records()
-    idx = next((i for i, u in enumerate(users) if u['username'] == st.session_state.username), None)
+    st.title("✅ Verifikasi Booking Kamar")
     
-    if idx is None:
-        st.error("User tidak ditemukan")
-        return
+    # Custom CSS untuk verifikasi booking
+    st.markdown("""
+    <style>
+    .booking-card {
+        background: rgba(60,60,60,0.7);
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        border-left: 4px solid #42A5F5;
+    }
+    .booking-header {
+        color: #42A5F5;
+        font-size: 1.2rem;
+        margin-bottom: 10px;
+    }
+    .booking-detail {
+        margin-bottom: 5px;
+    }
+    .action-btn {
+        margin-top: 10px;
+        width: 100%;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    try:
+        # Load data dari Google Sheets
+        booking_ws = connect_gsheet().worksheet("Booking")
+        user_ws = connect_gsheet().worksheet("User")
+        kamar_ws = connect_gsheet().worksheet("Kamar")
         
-    user_data = users[idx]
-
-    st.header("👤 Profil Saya")
-
-    col1, col2 = st.columns([1,3])
-
-    with col1:
-        if user_data.get('foto_profil'):
-            st.image(user_data['foto_profil'], width=100, caption="Foto Profil")
-
-    with col2:
-        st.markdown(f"""
-        <p><strong>Username:</strong> {user_data['username']}</p>
-        <p><strong>Nama Lengkap:</strong> {user_data.get('nama_lengkap','')}</p>
-        <p><strong>Nomor HP/Email:</strong> {user_data.get('no_hp','')}</p>
-        <p><strong>Kamar:</strong> {user_data.get('kamar','-')}</p>
-        <p><strong>Status Pembayaran:</strong> {user_data.get('status_pembayaran','-')}</p>
-        <p><strong>Deskripsi:</strong> {user_data.get('deskripsi','')}</p>
-        """, unsafe_allow_html=True)
-
-    if st.button("Edit Profil"):
-        st.session_state.profil_submenu = "edit_profil"
-
-    if st.session_state.profil_submenu == "edit_profil":
-        st.subheader("Edit Profil")
-        last_edit_str = user_data.get('last_edit', '')
-        can_edit = True
-
-        if st.session_state.role != 'admin':
-            if last_edit_str:
-                try:
-                    last_edit = datetime.strptime(last_edit_str, "%Y-%m-%d %H:%M:%S")
-                    if datetime.now() - last_edit < timedelta(days=7):
-                        can_edit = False
-                except:
-                    pass
-
-        if can_edit:
-            nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
-            kontak = st.text_input("Nomor HP / Email", value=user_data.get('no_hp',''))
-            deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi',''))
-            foto = st.file_uploader("Foto Profil", type=["jpg","jpeg","png"])
-            new_password = st.text_input("Ganti Password (Opsional)", type="password")
-
-            if st.button("Simpan Perubahan"):
-                link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto_profil','')
+        bookings = booking_ws.get_all_records()
+        kamar_data = kamar_ws.get_all_records()
+        
+        if not bookings:
+            st.info("Tidak ada booking yang perlu diverifikasi")
+            return
+            
+        st.markdown(f"**Total Booking Menunggu Verifikasi:** {len(bookings)}")
+        
+        # Filter berdasarkan kamar
+        kamar_list = sorted(list(set(b['kamar_dipilih'] for b in bookings if 'kamar_dipilih' in b)))
+        selected_kamar = st.selectbox("Filter Berdasarkan Kamar", ["Semua Kamar"] + kamar_list)
+        
+        # Apply filter
+        filtered_bookings = bookings
+        if selected_kamar != "Semua Kamar":
+            filtered_bookings = [b for b in bookings if b['kamar_dipilih'] == selected_kamar]
+        
+        for idx, booking in enumerate(filtered_bookings):
+            with st.expander(f"Booking #{idx+1}: {booking['nama']} - {booking['kamar_dipilih']}", expanded=False):
+                st.markdown(f"""
+                <div class="booking-card">
+                    <div class="booking-header">Detail Booking</div>
+                    <p class="booking-detail"><strong>Nama:</strong> {booking['nama']}</p>
+                    <p class="booking-detail"><strong>Kamar Dipilih:</strong> {booking['kamar_dipilih']}</p>
+                    <p class="booking-detail"><strong>Kontak:</strong> {booking.get('no_hp_email', '-')}</p>
+                    <p class="booking-detail"><strong>Waktu Booking:</strong> {booking.get('waktu_booking', '-')}</p>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Update data sesuai struktur sheet User
-                updates = {
-                    4: nama,                # D (nama_lengkap)
-                    5: f"'{kontak}",       # E (no_hp)
-                    6: deskripsi,           # F (deskripsi)
-                    7: link,                # G (foto_profil)
-                    8: datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # H (last_edit)
-                }
+                # Tombol aksi
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Setujui Booking", key=f"approve_{idx}", 
+                               help="Setujui booking dan buat akun penyewa baru",
+                               use_container_width=True):
+                        # Buat akun user baru
+                        password = "12345678"  # Password default
+                        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                        
+                        # Data user baru
+                        new_user = [
+                            booking['nama'],           # username
+                            hashed,                   # password_hash
+                            "penyewa",                # role
+                            booking['nama'],          # nama_lengkap
+                            booking.get('no_hp_email', ''),  # no_hp
+                            booking['kamar_dipilih'], # kamar
+                            "",                       # deskripsi
+                            "",                       # foto_profil
+                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # last_edit
+                            "Belum Bayar"             # status_pembayaran
+                        ]
+                        
+                        # Tambahkan user baru
+                        user_ws.append_row(new_user)
+                        
+                        # Update status kamar menjadi "Terisi"
+                        for i, kamar in enumerate(kamar_data):
+                            if kamar['Nama'] == booking['kamar_dipilih']:
+                                kamar_ws.update_cell(i+2, 2, "Terisi")
+                                break
+                        
+                        # Hapus dari daftar booking
+                        all_bookings = booking_ws.get_all_values()
+                        row_num = next((i+1 for i, row in enumerate(all_bookings) if row[0] == booking['nama'] and row[1] == booking['kamar_dipilih']), None)
+                        if row_num:
+                            booking_ws.delete_rows(row_num)
+                        
+                        st.success(f"Booking disetujui! Akun untuk {booking['nama']} telah dibuat dengan password default: {password}")
+                        st.rerun()
                 
-                for col, value in updates.items():
-                    user_ws.update_cell(idx + 2, col, value)
+                with col2:
+                    if st.button("❌ Tolak Booking", key=f"reject_{idx}",
+                               help="Tolak booking dan hapus dari daftar",
+                               use_container_width=True):
+                        # Hapus dari daftar booking
+                        all_bookings = booking_ws.get_all_values()
+                        row_num = next((i+1 for i, row in enumerate(all_bookings) if row[0] == booking['nama'] and row[1] == booking['kamar_dipilih']), None)
+                        if row_num:
+                            booking_ws.delete_rows(row_num)
+                            st.warning(f"Booking dari {booking['nama']} telah ditolak dan dihapus")
+                            st.rerun()
                 
-                if new_password:
-                    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-                    user_ws.update_cell(idx + 2, 2, hashed)  # B (password_hash)
+                # Tambahkan informasi kamar
+                kamar_info = next((k for k in kamar_data if k['Nama'] == booking['kamar_dipilih']), None)
+                if kamar_info:
+                    st.markdown("**Informasi Kamar:**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"Harga: Rp {int(kamar_info['Harga']):,}/bulan")
+                        st.write(f"Status: {kamar_info['Status']}")
+                    with col2:
+                        if kamar_info.get('link_foto'):
+                            st.image(kamar_info['link_foto'], caption=kamar_info['Nama'], width=150)
+    
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memproses booking: {str(e)}")
+        
+def profil_saya():
+    st.title("👤 Profil Saya")
+    
+    # Custom CSS untuk halaman profil
+    st.markdown("""
+    <style>
+    .profile-card {
+        background: rgba(60,60,60,0.7);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        margin-bottom: 20px;
+    }
+    .profile-header {
+        color: #42A5F5;
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 10px;
+    }
+    .profile-detail {
+        margin-bottom: 10px;
+    }
+    .edit-form {
+        background: rgba(60,60,60,0.9);
+        padding: 20px;
+        border-radius: 12px;
+        margin-top: 20px;
+    }
+    .password-toggle {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    try:
+        # Load data user dari Google Sheets
+        user_ws = connect_gsheet().worksheet("User")
+        users = user_ws.get_all_records()
+        user_data = next((u for u in users if u['username'] == st.session_state.username), None)
+        
+        if not user_data:
+            st.error("Data pengguna tidak ditemukan")
+            return
+
+        # Tampilkan data profil
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.markdown("### Foto Profil")
+            if user_data.get('foto_profil'):
+                st.image(user_data['foto_profil'], width=150, caption="Foto Profil Saat Ini")
+            else:
+                st.image("https://via.placeholder.com/150", width=150, caption="Belum Ada Foto")
+            
+            # Statistik aktivitas
+            st.markdown("### Aktivitas Terakhir")
+            st.markdown(f"""
+            <div class="profile-detail">
+                <p><strong>Login Terakhir:</strong> {user_data.get('last_login', '-')}</p>
+                <p><strong>Edit Profil Terakhir:</strong> {user_data.get('last_edit', '-')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("### Informasi Profil")
+            st.markdown(f"""
+            <div class="profile-card">
+                <div class="profile-header">Data Pribadi</div>
+                <p class="profile-detail"><strong>Username:</strong> {user_data['username']}</p>
+                <p class="profile-detail"><strong>Nama Lengkap:</strong> {user_data.get('nama_lengkap', '-')}</p>
+                <p class="profile-detail"><strong>Nomor HP/Email:</strong> {user_data.get('no_hp', '-')}</p>
+                <p class="profile-detail"><strong>Role:</strong> {user_data['role'].capitalize()}</p>
+                {f'<p class="profile-detail"><strong>Kamar:</strong> {user_data.get("kamar", "-")}</p>' if user_data['role'] == 'penyewa' else ''}
+                {f'<p class="profile-detail"><strong>Status Pembayaran:</strong> {user_data.get("status_pembayaran", "-")}</p>' if user_data['role'] == 'penyewa' else ''}
+                <p class="profile-detail"><strong>Deskripsi:</strong> {user_data.get('deskripsi', '-')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Tombol edit profil
+        if st.button("✏️ Edit Profil", key="edit_profile_btn"):
+            st.session_state.edit_profile = True
+        
+        # Form edit profil
+        if st.session_state.get('edit_profile'):
+            with st.form(key='edit_profile_form'):
+                st.markdown("### Edit Profil")
                 
-                st.success("Profil berhasil diperbarui.")
-                st.session_state.profil_submenu = None
-                st.rerun()
-        else:
-            st.warning("Edit profil hanya bisa dilakukan 1x dalam seminggu.")
+                # Cek apakah bisa edit (untuk non-admin, maksimal 1x seminggu)
+                can_edit = True
+                if st.session_state.role != 'admin':
+                    last_edit_str = user_data.get('last_edit', '')
+                    if last_edit_str:
+                        try:
+                            last_edit = datetime.strptime(last_edit_str, "%Y-%m-%d %H:%M:%S")
+                            if datetime.now() - last_edit < timedelta(days=7):
+                                can_edit = False
+                                st.warning("Anda hanya bisa mengedit profil 1 kali dalam seminggu")
+                        except:
+                            pass
+                
+                if can_edit:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap', ''))
+                        kontak = st.text_input("Nomor HP/Email", value=user_data.get('no_hp', ''))
+                        deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi', ''))
+                    
+                    with col2:
+                        foto = st.file_uploader("Upload Foto Profil Baru", type=["jpg", "jpeg", "png"])
+                        
+                        # Toggle password visibility
+                        st.markdown("### Ganti Password (Opsional)")
+                        show_password = st.checkbox("Tampilkan Password", key="show_pass")
+                        password_type = "text" if show_password else "password"
+                        new_password = st.text_input("Password Baru", type=password_type)
+                        confirm_password = st.text_input("Konfirmasi Password", type=password_type)
+                        
+                        if new_password and new_password != confirm_password:
+                            st.error("Password tidak cocok!")
+                    
+                    # Tombol aksi
+                    col1, col2, _ = st.columns([1, 1, 2])
+                    with col1:
+                        if st.form_submit_button("💾 Simpan Perubahan"):
+                            # Validasi password
+                            if new_password and new_password != confirm_password:
+                                st.error("Password tidak cocok!")
+                            else:
+                                # Upload foto baru jika ada
+                                link_foto = upload_to_cloudinary(foto, f"profil_{st.session_state.username}") if foto else user_data.get('foto_profil', '')
+                                
+                                # Update data di Google Sheets
+                                all_users = user_ws.get_all_values()
+                                row_num = next((i+1 for i, row in enumerate(all_users) if row[0] == st.session_state.username), None)
+                                
+                                if row_num:
+                                    updates = {
+                                        4: nama,  # nama_lengkap
+                                        5: f"'{kontak}",  # no_hp (ditambahkan ' untuk format nomor)
+                                        6: user_data.get('kamar', ''),  # kamar
+                                        7: deskripsi,  # deskripsi
+                                        8: link_foto,  # foto_profil
+                                        9: datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # last_edit
+                                    }
+                                    
+                                    for col, value in updates.items():
+                                        user_ws.update_cell(row_num, col, value)
+                                    
+                                    # Update password jika diisi
+                                    if new_password:
+                                        hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                                        user_ws.update_cell(row_num, 2, hashed)  # password_hash
+                                    
+                                    st.success("Profil berhasil diperbarui!")
+                                    st.session_state.edit_profile = False
+                                    st.rerun()
+                    
+                    with col2:
+                        if st.form_submit_button("❌ Batal"):
+                            st.session_state.edit_profile = False
+                            st.rerun()
+    
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memuat profil: {str(e)}")
