@@ -40,25 +40,23 @@ def login(username, password):
     return None
 
 # ---------- Fitur Admin ----------
-
 def kelola_kamar():
     st.subheader("🏠 Kelola Data Kamar")
     kamar_ws = connect_gsheet().worksheet("Kamar")
     data = kamar_ws.get_all_records()
 
     for idx, k in enumerate(data):
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"**{k['Nama']}** - {k['Status']} - Rp{k['Harga']}")
+        label = f"**{k['Nama']}** - Rp{k['Harga']}"
+        with st.expander(label):
+            st.write(f"**Status:** {k['Status']}")
             st.text(k['Deskripsi'])
             if k['Link Foto']:
                 try:
-                    st.image(k['Link Foto'], width=150)
+                    st.image(k['Link Foto'], width=300)
                 except Exception:
-                    st.warning(f"Gagal menampilkan foto untuk {k['Nama']}.")
+                    st.warning("Gagal menampilkan foto.")
             else:
                 st.info("Tidak ada foto.")
-        with col2:
             if st.button(f"Hapus {k['Nama']}", key=f"hapus_{idx}"):
                 kamar_ws.delete_rows(idx + 2)
                 st.success(f"Kamar {k['Nama']} dihapus.")
@@ -78,8 +76,8 @@ def kelola_kamar():
             return
 
         safe_nama = re.sub(r'[^a-zA-Z0-9_\-]', '_', nama)
-        
         link_foto = ""
+
         if foto:
             try:
                 link_foto = upload_to_cloudinary(foto, f"{safe_nama}.jpg")
