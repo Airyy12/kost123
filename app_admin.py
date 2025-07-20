@@ -21,9 +21,14 @@ def run_admin(menu):
             del st.session_state[key]
         st.rerun()
 
+import plotly.express as px
+from collections import Counter
+import pandas as pd
+
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
 
+    # Load data dari Google Sheets
     kamar_ws = connect_gsheet().worksheet("Kamar")
     user_ws = connect_gsheet().worksheet("User")
     pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
@@ -34,24 +39,55 @@ def admin_dashboard():
     pembayaran_data = pembayaran_ws.get_all_records()
     komplain_data = komplain_ws.get_all_records()
 
+    # Hitung metrik utama
     total_kamar = len(kamar_data)
     kamar_terisi = sum(1 for k in kamar_data if k['Status'].lower() == 'terisi')
     kamar_kosong = total_kamar - kamar_terisi
     penyewa = sum(1 for u in user_data if u['role'] == 'penyewa')
     total_pemasukan = sum(int(p.get('nominal', 0)) for p in pembayaran_data if str(p.get('nominal', '')).isdigit())
 
+    # Tampilan metrik
+    st.markdown("### 📌 Statistik Umum")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Kamar", total_kamar)
     col2.metric("Kamar Terisi", kamar_terisi)
     col3.metric("Kamar Kosong", kamar_kosong)
     col4.metric("Penyewa Aktif", penyewa)
 
-    st.markdown("### 💰 Pemasukan Bulan Ini")
-    st.write(f"Rp {total_pemasukan:,}")
+    st.markdown("---")
 
-    st.markdown("### 📢 Komplain Terbaru")
+    # Pemasukan bulan ini
+    st.markdown("### 💰 Total Pemasukan Bulan Ini")
+    st.success(f"Rp {total_pemasukan:,}")
+
+    st.markdown("---")
+
+    # Grafik Komplain per Bulan
+    st.markdown("### 📢 Ringkasan Komplain per Bulan")
+
+    if komplain_data:
+        df_komplain = pd.DataFrame(komplain_data)
+        df_komplain['bulan'] = pd.to_datetime(df_komplain['waktu']).dt.strftime('%B %Y')
+
+        komplain_per_bulan = df_komplain['bulan'].value_counts().sort_index()
+        fig = px.bar(
+            x=komplain_per_bulan.index,
+            y=komplain_per_bulan.values,
+            labels={'x': 'Bulan', 'y': 'Jumlah Komplain'},
+            title="Jumlah Komplain per Bulan",
+            color_discrete_sequence=["indianred"]
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Belum ada data komplain.")
+
+    st.markdown("---")
+
+    # Komplain terbaru
+    st.markdown("### 📌 Komplain Terbaru")
     for k in komplain_data[-5:]:
-        st.write(f"{k['username']} : {k['isi_komplain']} ({k['waktu']})")
+        st.write(f"- {k['username']} : {k['isi_komplain']} ({k['waktu']})")
+
 
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
