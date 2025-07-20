@@ -206,13 +206,13 @@ def profil_saya():
 
             if st.button("Simpan Perubahan"):
                 link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto','')
-                user_ws.update(f"C{idx+2}", nama)
-                user_ws.update(f"D{idx+2}", kontak)
-                user_ws.update(f"E{idx+2}", link)
-                user_ws.update(f"I{idx+2}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                user_ws.update_cell(idx+2, 3, nama)
+                user_ws.update_cell(idx+2, 4, kontak)
+                user_ws.update_cell(idx+2, 5, link)
+                user_ws.update_cell(idx+2, 9, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 if new_password:
                     hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-                    user_ws.update(f"B{idx+2}", hashed)
+                    user_ws.update_cell(idx+2, 2, hashed)
                 st.success("Profil berhasil diperbarui.")
                 st.session_state.submenu = None
         else:
