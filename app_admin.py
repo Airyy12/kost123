@@ -175,11 +175,18 @@ def profil_saya():
 
     st.header("👤 Profil Saya")
 
-    st.write(f"**Username:** {user_data['username']}")
-    st.write(f"**Nama Lengkap:** {user_data.get('nama_lengkap','')}")
-    st.write(f"**Nomor HP/Email:** {user_data.get('no_hp','')}")
-    st.write(f"**Kamar:** {user_data.get('kamar','-')}")
-    st.write(f"**Deskripsi Diri:** {user_data.get('deskripsi','')}")
+    col1, col2 = st.columns([1,3])
+
+    with col1:
+        if user_data.get('foto_profil'):
+            st.image(user_data['foto_profil'], width=100, caption="Foto Profil")
+
+    with col2:
+        st.write(f"**Username:** {user_data['username']}")
+        st.write(f"**Nama Lengkap:** {user_data.get('nama_lengkap','')}")
+        st.write(f"**Nomor HP/Email:** {user_data.get('no_hp','')}")
+        st.write(f"**Kamar:** {user_data.get('kamar','-')}")
+        st.write(f"**Deskripsi Diri:** {user_data.get('deskripsi','')}")
 
     if st.button("Edit Profil"):
         st.session_state.submenu = "edit_profil"
