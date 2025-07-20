@@ -222,7 +222,7 @@ def manajemen_penyewa():
             penyewa = [p for p in penyewa if pencarian.lower() in p.get('nama_lengkap', '').lower()]
         
         for idx, p in enumerate(penyewa):
-            with st.expander(f"{p.get('nama_lengkap', p['username'])} - {p.get('kamar','-')}"):
+            with st.expander(f"{p.get('nama_lengkap', p['username'])} - {p.get('kamar','')}"):
                 with st.form(key=f"form_{p['username']}"):
                     nama = st.text_input("Nama Lengkap", value=p.get('nama_lengkap',''))
                     kontak = st.text_input("No HP/Email", value=p.get('no_hp',''))
@@ -589,7 +589,3 @@ def profil_saya():
     
     except Exception as e:
         st.error(f"Terjadi kesalahan: {str(e)}")
-
-def run_admin(menu):
-    jalankan_admin(menu)
- 
