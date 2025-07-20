@@ -1,5 +1,6 @@
 import gspread
 import streamlit as st
+import pandas as pd  # WAJIB ADA!
 from oauth2client.service_account import ServiceAccountCredentials
 
 def connect_gsheet():
@@ -12,9 +13,7 @@ def connect_gsheet():
     sheet = client.open_by_key(st.secrets["gsheet_id"])
     return sheet
 
-# Di dalam sheet.py
 def load_sheet_data(sheet_name):
     worksheet = connect_gsheet().worksheet(sheet_name.capitalize())
     data = worksheet.get_all_records()
     return pd.DataFrame(data)
-
