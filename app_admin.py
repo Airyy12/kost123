@@ -70,6 +70,11 @@ body {
 .stButton>button:hover {
     background-color: #505050;
 }
+.label-align {
+    display: inline-block;
+    width: 150px;
+    font-weight: bold;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -182,11 +187,13 @@ def profil_saya():
             st.image(user_data['foto_profil'], width=100, caption="Foto Profil")
 
     with col2:
-        st.write(f"**Username:** {user_data['username']}")
-        st.write(f"**Nama Lengkap:** {user_data.get('nama_lengkap','')}")
-        st.write(f"**Nomor HP/Email:** {user_data.get('no_hp','')}")
-        st.write(f"**Kamar:** {user_data.get('kamar','-')}")
-        st.write(f"**Deskripsi Diri:** {user_data.get('deskripsi','')}")
+        st.markdown(f"""
+        <p><span class="label-align">Username:</span> {user_data['username']}</p>
+        <p><span class="label-align">Nama Lengkap:</span> {user_data.get('nama_lengkap','')}</p>
+        <p><span class="label-align">Nomor HP/Email:</span> {user_data.get('no_hp','')}</p>
+        <p><span class="label-align">Kamar:</span> {user_data.get('kamar','-')}</p>
+        <p><span class="label-align">Deskripsi Diri:</span> {user_data.get('deskripsi','')}</p>
+        """, unsafe_allow_html=True)
 
     if st.button("Edit Profil"):
         st.session_state.submenu = "edit_profil"
