@@ -38,7 +38,7 @@ def tampilkan_loading(pesan):
     return st.spinner(pesan)
 
 # Fungsi utama admin
-def jalankan_admin(menu):
+def run_admin(menu):
     """Router menu utama admin"""
     if menu == "Dashboard Admin":
         dashboard_admin()
