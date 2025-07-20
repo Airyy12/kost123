@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sheets import load_sheet_data, update_sheet_data
+from sheets import load_sheet_data
 from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime
 
@@ -40,7 +40,6 @@ def kelola_kamar():
                     "link_foto": link_foto
                 }
                 df_kamar = pd.concat([df_kamar, pd.DataFrame([new_row])], ignore_index=True)
-                update_sheet_data(sheet_kamar, df_kamar)
                 st.success("Kamar berhasil ditambahkan!")
                 st.rerun()
 
@@ -65,7 +64,6 @@ def manajemen():
                     df_user.at[idx, "deskripsi"] = deskripsi
                     df_user.at[idx, "status_pembayaran"] = status_pembayaran
                     df_user.at[idx, "last_edit"] = datetime.now().isoformat()
-                    update_sheet_data(sheet_user, df_user)
                     st.success("Data berhasil diperbarui")
                     st.rerun()
 
@@ -82,7 +80,6 @@ def manajemen():
                 if submit_bayar:
                     df_pembayaran.at[idx, "nominal"] = nominal
                     df_pembayaran.at[idx, "status"] = status
-                    update_sheet_data(sheet_pembayaran, df_pembayaran)
                     st.success("Pembayaran berhasil diperbarui")
                     st.rerun()
 
@@ -98,13 +95,16 @@ def manajemen():
             if st.button("💬 Simpan Tanggapan", key=f"tanggapi_{idx}"):
                 df_komplain.at[idx, "status"] = status
                 df_komplain.at[idx, "tanggapan"] = tanggapan
-                update_sheet_data(sheet_komplain, df_komplain)
                 st.success("Tanggapan disimpan")
                 st.rerun()
 
 def run_admin(menu):
     if menu == "Dashboard Admin":
         admin_dashboard()
+    elif menu == "Kelola Kamar":
+        kelola_kamar()
+    elif menu == "Manajemen":
+        manajemen()
     elif menu == "Kelola Kamar":
         kelola_kamar()
     elif menu == "Manajemen":
