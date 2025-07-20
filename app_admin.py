@@ -107,7 +107,7 @@ def manajemen_penyewa():
                     user_ws.update(f"F{idx+2}", kamar)
                     user_ws.update(f"G{idx+2}", deskripsi)
                     st.success("Data berhasil diupdate.")
-                   st.rerun()
+                    st.rerun()
 
                 if st.button("Reset Password", key=f"reset_{idx}"):
                     new_pass = "12345678"
@@ -118,7 +118,7 @@ def manajemen_penyewa():
                 if st.button("Hapus Penyewa", key=f"hapus_{idx}"):
                     user_ws.delete_rows(idx+2)
                     st.warning("Penyewa dihapus. Silakan refresh halaman.")
-                   st.rerun()
+                    st.rerun()
 
 def manajemen_komplain():
     st.title("📢 Manajemen Komplain")
@@ -159,13 +159,13 @@ def manajemen_komplain():
                 if st.button("✅ Selesaikan", key=f"selesai_{idx}"):
                     komplain_ws.update_cell(idx + 2, 6, "Selesai")  # Kolom status
                     st.success(f"Komplain dari {username} telah diselesaikan.")
-                   st.rerun()
+                    st.rerun()
 
             with col2:
                 if st.button("❌ Tolak", key=f"tolak_komplain_{idx}"):
                     komplain_ws.update_cell(idx + 2, 6, "Ditolak")  # Kolom status
                     st.warning(f"Komplain dari {username} telah ditolak.")
-                   st.rerun()
+                    st.rerun()
 
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
@@ -205,13 +205,13 @@ def manajemen_pembayaran():
                         st.success(f"Pembayaran {username} berhasil diverifikasi.")
 
                     pembayaran_ws.delete_rows(idx+2)
-                   st.rerun()
+                    st.rerun()
 
             with col2:
                 if st.button("❌ Tolak", key=f"tolak_{idx}"):
                     pembayaran_ws.delete_rows(idx+2)
                     st.warning(f"Pembayaran dari {username} telah ditolak.")
-                   st.rerun()
+                    st.rerun()
 
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
