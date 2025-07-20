@@ -2,7 +2,7 @@ import streamlit as st
 import bcrypt
 from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
-from datetime import datetime
+from datetime import datetime, timedelta
 import calendar
 import re
 
@@ -13,6 +13,12 @@ def get_current_month():
 def get_current_year():
     return datetime.now().year
 
+def can_edit_profile(last_edit):
+    if not last_edit:
+        return True
+    last_time = datetime.strptime(last_edit, "%Y-%m-%d %H:%M:%S")
+    return datetime.now() - last_time > timedelta(days=7)
+
 # ---------- Fungsi Cek Kolom ----------
 def ensure_status_pembayaran_column():
     user_ws = connect_gsheet().worksheet("User")
@@ -22,6 +28,10 @@ def ensure_status_pembayaran_column():
         users = user_ws.get_all_records()
         for idx, _ in enumerate(users):
             user_ws.update_cell(idx+2, len(header)+1, "Belum Lunas")
+    if "Foto Profil" not in header:
+        user_ws.update_cell(1, len(header)+1, "Foto Profil")
+    if "Last Edit" not in header:
+        user_ws.update_cell(1, len(header)+1, "Last Edit")
 
 # ---------- Fungsi Login & Registrasi ----------
 def cek_admin():
@@ -43,7 +53,7 @@ def registrasi_admin():
         else:
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
             user_ws = connect_gsheet().worksheet("User")
-            user_ws.append_row([username, hashed, "admin", "", "", "", "Belum Lunas"])
+            user_ws.append_row([username, hashed, "admin", "", "", password, "Belum Lunas", "", ""])
             st.success("Admin berhasil dibuat. Silakan login.")
             st.rerun()
 
@@ -122,7 +132,7 @@ def verifikasi_booking():
         if st.button(f"Setujui {b['nama']}", key=f"setuju{idx}"):
             password = "12345678"
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], b['no_hp_email'], password, "Belum Lunas"])
+            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], b['no_hp_email'], password, "Belum Lunas", "", ""])
 
             for i, k in enumerate(kamar_data):
                 if k['Nama'] == b['kamar_dipilih']:
@@ -132,71 +142,47 @@ def verifikasi_booking():
             st.success(f"{b['nama']} disetujui. Password default: {password}")
             st.rerun()
 
-def manajemen_penyewa():
-    st.subheader("👥 Manajemen Penyewa")
-    ensure_status_pembayaran_column()
-
+# ---------- Fitur Manajemen Akun ----------
+def manajemen_akun(username, role):
+    st.subheader("👤 Manajemen Akun Saya")
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
 
     for idx, u in enumerate(users):
-        if u['role'] == 'penyewa':
-            label = f"{u['username']} ({u['kamar']})"
-            with st.expander(label):
-                st.write(f"**Kontak:** {u['kontak']}")
-                st.write(f"**Password:** {u['password_default']}")
-                st.write(f"**Status Pembayaran Bulan Ini:** {u['Status Pembayaran']}")
+        if u['username'] == username:
+            foto_profil = u.get('Foto Profil', '')
+            last_edit = u.get('Last Edit', '')
 
-                new_status = st.selectbox("Update Status Pembayaran", ["Lunas", "Belum Lunas"], index=0 if u['Status Pembayaran'] == "Lunas" else 1, key=f"status_{idx}")
-                new_kontak = st.text_input("Update Kontak", value=u['kontak'], key=f"kontak_{idx}")
+            if foto_profil:
+                st.image(foto_profil, width=150)
 
-                if st.button(f"Simpan Perubahan {u['username']}", key=f"simpan_{idx}"):
-                    user_ws.update(f"E{idx+2}", [[new_kontak]])
-                    user_ws.update(f"G{idx+2}", [[new_status]])
-                    st.success("Data berhasil diperbarui.")
+            new_name = st.text_input("Nama Lengkap", value=u['username'])
+            new_kontak = st.text_input("Nomor Telepon", value=u['kontak'])
+            new_password = st.text_input("Password Baru", type="password")
+            foto_baru = st.file_uploader("Upload Foto Profil", type=["jpg", "jpeg", "png"])
 
-# ---------- Fitur Penyewa ----------
-def fitur_penyewa(username):
-    st.header(f"Selamat Datang, {username}")
-    ensure_status_pembayaran_column()
+            can_edit = role == 'admin' or can_edit_profile(last_edit)
 
-    menu = st.sidebar.selectbox("Menu Penyewa", ["Upload Pembayaran", "Komplain", "Cek Status Pembayaran"])
+            if st.button("Simpan Perubahan"):
+                if not can_edit:
+                    st.warning("Anda hanya bisa mengedit akun 1x dalam seminggu.")
+                    return
+                updates = {
+                    f"A{idx+2}": new_name,
+                    f"E{idx+2}": new_kontak,
+                    f"I{idx+2}": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                if new_password:
+                    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                    updates[f"B{idx+2}"] = hashed
+                if foto_baru:
+                    link_foto = upload_to_cloudinary(foto_baru, f"FotoProfil_{username}_{datetime.now().strftime('%Y%m%d%H%M')}" )
+                    updates[f"H{idx+2}"] = link_foto
 
-    if menu == "Upload Pembayaran":
-        bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg", "jpeg", "png"])
-        bulan = st.selectbox("Pilih Bulan", list(calendar.month_name)[1:])
-        tahun = st.text_input("Tahun (contoh: 2025)")
-
-        if st.button("Kirim Bukti"):
-            if not tahun or not tahun.isdigit():
-                st.warning("Mohon isi tahun dengan angka.")
-            else:
-                bulan_tahun = f"{bulan} {tahun}"
-                link = ""
-                if bukti:
-                    link = upload_to_cloudinary(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
-                bayar_ws = connect_gsheet().worksheet("Pembayaran")
-                bayar_ws.append_row([username, link, bulan_tahun, str(datetime.now())])
-                st.success("Bukti pembayaran berhasil dikirim.")
-
-    if menu == "Komplain":
-        isi = st.text_area("Tulis Komplain Anda")
-        foto_komplain = st.file_uploader("Upload Foto (Opsional)", type=["jpg", "jpeg", "png"])
-        if st.button("Kirim Komplain"):
-            link_foto = ""
-            if foto_komplain:
-                link_foto = upload_to_cloudinary(foto_komplain, f"Komplain_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
-            komplain_ws = connect_gsheet().worksheet("Komplain")
-            komplain_ws.append_row([username, isi, link_foto, str(datetime.now())])
-            st.success("Komplain berhasil dikirim.")
-
-    if menu == "Cek Status Pembayaran":
-        user_ws = connect_gsheet().worksheet("User")
-        users = user_ws.get_all_records()
-        for u in users:
-            if u['username'] == username:
-                st.write(f"**Kamar:** {u['kamar']}")
-                st.write(f"**Status Pembayaran Bulan Ini:** {u['Status Pembayaran']}")
+                for cell, value in updates.items():
+                    user_ws.update(cell, value)
+                st.success("Data akun berhasil diperbarui.")
+                st.rerun()
 
 # ---------- Session State Handling ----------
 st.set_page_config(page_title="Dashboard Kost123", layout="wide")
@@ -227,16 +213,20 @@ else:
         st.sidebar.success(f"Login sebagai {st.session_state.role.capitalize()}")
 
         if st.session_state.role == "admin":
-            menu = st.sidebar.selectbox("Menu Admin", ["Kelola Kamar", "Verifikasi Booking", "Manajemen Penyewa"])
+            menu = st.sidebar.selectbox("Menu Admin", ["Kelola Kamar", "Verifikasi Booking", "Manajemen Akun"])
             if menu == "Kelola Kamar":
                 kelola_kamar()
             elif menu == "Verifikasi Booking":
                 verifikasi_booking()
-            elif menu == "Manajemen Penyewa":
-                manajemen_penyewa()
+            elif menu == "Manajemen Akun":
+                manajemen_akun(st.session_state.username, st.session_state.role)
 
         elif st.session_state.role == "penyewa":
-            fitur_penyewa(st.session_state.username)
+            menu = st.sidebar.selectbox("Menu Penyewa", ["Manajemen Akun", "Upload Pembayaran", "Komplain"])
+            if menu == "Manajemen Akun":
+                manajemen_akun(st.session_state.username, st.session_state.role)
+            elif menu == "Upload Pembayaran":
+                fitur_penyewa(st.session_state.username)
 
         if st.sidebar.button("Logout"):
             st.session_state.login_status = False
