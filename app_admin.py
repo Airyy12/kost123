@@ -44,13 +44,14 @@ body {
     box-shadow: inset 0 0 5px #00000055;
 }
 .info-card {
-    background: rgba(150,0,0,0.3);
+    background: rgba(60,60,60,0.5);
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 .stButton>button {
-    background-color: #4CAF50;
+    background-color: #3d3d3d;
     color: white;
     padding: 10px 24px;
     border: none;
@@ -59,7 +60,7 @@ body {
     font-size: 16px;
 }
 .stButton>button:hover {
-    background-color: #45a049;
+    background-color: #505050;
 }
 </style>
 """, unsafe_allow_html=True)
