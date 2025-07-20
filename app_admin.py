@@ -37,6 +37,40 @@ def tampilkan_loading(pesan):
     """Menampilkan indikator loading"""
     return st.spinner(pesan)
 
+def handle_image_upload(uploaded_file, prefix):
+    """Fungsi untuk menangani upload gambar dengan error handling"""
+    if uploaded_file is None:
+        return ""
+    
+    try:
+        # Pastikan file adalah gambar
+        if uploaded_file.type not in ["image/jpeg", "image/png", "image/jpg"]:
+            st.error("Format file tidak didukung. Harap upload gambar JPEG atau PNG")
+            return ""
+            
+        # Upload ke Cloudinary dengan penanganan error
+        try:
+            result = upload_to_cloudinary(uploaded_file, prefix)
+            return result.get("secure_url", "") if result else ""
+        except Exception as upload_error:
+            st.error(f"Gagal mengupload gambar: {str(upload_error)}")
+            return ""
+            
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memproses gambar: {str(e)}")
+        return ""
+
+def safe_display_image(image_url):
+    """Menampilkan gambar dengan error handling"""
+    if not image_url:
+        return
+        
+    try:
+        st.image(image_url, use_column_width=True)
+    except:
+        st.warning("Gambar tidak dapat dimuat")
+        st.text(f"URL: {image_url}")
+        
 # Fungsi utama admin
 def jalankan_admin(menu):
     """Router menu utama admin"""
@@ -114,76 +148,198 @@ def dashboard_admin():
     except Exception as e:
         st.error(f"Terjadi kesalahan: {str(e)}")
 
-def kelola_kamar():
-    """Halaman pengelolaan kamar"""
-    st.title("🛠️ Kelola Kamar")
+def profil_saya():
+    """Halaman profil pengguna dengan penanganan error yang lebih baik"""
+    st.title("👤 Profil Saya")
+    
+    # Cek session login
+    if 'username' not in st.session_state:
+        st.error("Anda belum login. Silakan login terlebih dahulu.")
+        return
     
     try:
-        ws_kamar = dapatkan_worksheet("Kamar")
-        data_kamar = ws_kamar.get_all_records()
+        # Dapatkan data pengguna
+        ws_user = dapatkan_worksheet("User")
+        data_user = ws_user.get_all_records()
         
-        tab1, tab2 = st.tabs(["Daftar Kamar", "Tambah Kamar"])
+        # Cari index user yang login
+        user_idx = next(
+            (i for i, u in enumerate(data_user) 
+             if u.get('username') == st.session_state.username),
+            None
+        )
         
-        with tab1:
-            st.markdown("### Daftar Kamar")
+        if user_idx is None:
+            st.error("Profil tidak ditemukan dalam database")
+            return
             
-            if not data_kamar:
-                st.info("Belum ada data kamar")
+        user_data = data_user[user_idx]
+        
+        # Tampilkan profil dalam dua kolom
+        col_profil, col_aksi = st.columns([3, 1])
+        
+        with col_profil:
+            st.subheader("Informasi Profil")
+            
+            # Tampilkan foto profil dengan error handling
+            if user_data.get('foto_profil'):
+                try:
+                    st.image(
+                        user_data['foto_profil'],
+                        width=200,
+                        caption="Foto Profil Saat Ini",
+                        use_column_width=False
+                    )
+                except:
+                    st.warning("Gambar profil tidak dapat dimuat")
+                    st.text(f"URL: {user_data['foto_profil']}")
             else:
-                pencarian = st.text_input("Cari Kamar")
-                filtered = data_kamar
-                if pencarian:
-                    filtered = [k for k in data_kamar if pencarian.lower() in k.get('Nama', '').lower()]
+                st.info("Belum ada foto profil")
+            
+            # Tampilkan data profil
+            st.markdown(f"""
+            **🔹 Username:** `{user_data.get('username', '-')}`  
+            **🔹 Nama Lengkap:** {user_data.get('nama_lengkap', '-')}  
+            **📞 Kontak:** {user_data.get('no_hp', '-')}  
+            **🏠 Kamar:** {user_data.get('kamar', '-')}  
+            **📝 Deskripsi:**  
+            {user_data.get('deskripsi', 'Belum ada deskripsi')}
+            """)
+        
+        with col_aksi:
+            st.subheader("Aksi")
+            if st.button("✏️ Edit Profil", use_container_width=True):
+                st.session_state.mode_edit = True
+                st.rerun()
                 
-                for k in filtered:
-                    with st.expander(f"{k.get('Nama', '')} - {k.get('Status', '')}"):
-                        col1, col2 = st.columns([1, 3])
-                        with col1:
-                            if k.get('Foto'):
-                                st.image(k['Foto'], use_column_width=True)
-                        with col2:
-                            st.markdown(f"""
-                            **Status:** {k.get('Status', '')}  
-                            **Harga:** {format_rupiah(k.get('Harga', 0))}  
-                            **Deskripsi:** {k.get('Deskripsi', '')}
-                            """)
-                        
-                        if st.button("Hapus Kamar", key=f"hapus_{k.get('Nama', '')}"):
-                            if konfirmasi_aksi("menghapus kamar ini"):
-                                nomor_baris = data_kamar.index(k) + 2
-                                ws_kamar.delete_rows(nomor_baris)
-                                st.success("Kamar berhasil dihapus")
+            if st.button("🔄 Refresh Data", use_container_width=True):
+                st.rerun()
+        
+        # Mode Edit Profil
+        if st.session_state.get('mode_edit', False):
+            st.markdown("---")
+            st.subheader("Edit Profil")
+            
+            with st.form("form_edit_profil"):
+                # Input fields
+                nama = st.text_input(
+                    "Nama Lengkap*",
+                    value=user_data.get('nama_lengkap', ''),
+                    help="Wajib diisi"
+                )
+                
+                kontak = st.text_input(
+                    "Nomor HP/Email*",
+                    value=user_data.get('no_hp', ''),
+                    help="Contoh: 081234567890 atau email@contoh.com"
+                )
+                
+                deskripsi = st.text_area(
+                    "Deskripsi Diri",
+                    value=user_data.get('deskripsi', ''),
+                    height=100
+                )
+                
+                foto = st.file_uploader(
+                    "Upload Foto Profil Baru",
+                    type=["jpg", "jpeg", "png"],
+                    accept_multiple_files=False
+                )
+                
+                st.markdown("**Ganti Password** (kosongkan jika tidak ingin mengubah)")
+                password_baru = st.text_input(
+                    "Password Baru",
+                    type="password",
+                    help="Minimal 8 karakter"
+                )
+                
+                konfirmasi_password = st.text_input(
+                    "Konfirmasi Password Baru",
+                    type="password"
+                )
+                
+                # Tombol aksi
+                col_simpan, col_batal = st.columns(2)
+                with col_simpan:
+                    simpan = st.form_submit_button(
+                        "💾 Simpan Perubahan",
+                        use_container_width=True
+                    )
+                with col_batal:
+                    if st.form_submit_button(
+                        "❌ Batal",
+                        use_container_width=True,
+                        type="secondary"
+                    ):
+                        st.session_state.mode_edit = False
+                        st.rerun()
+                
+                # Proses penyimpanan
+                if simpan:
+                    error_messages = []
+                    
+                    # Validasi input
+                    if not nama:
+                        error_messages.append("Nama lengkap wajib diisi")
+                    
+                    if not kontak:
+                        error_messages.append("Kontak wajib diisi")
+                    elif not (validasi_nomor_hp(kontak) or validasi_email(kontak)):
+                        error_messages.append("Format kontak tidak valid (gunakan nomor HP atau email)")
+                    
+                    if password_baru and len(password_baru) < 8:
+                        error_messages.append("Password minimal 8 karakter")
+                    
+                    if password_baru and (password_baru != konfirmasi_password):
+                        error_messages.append("Konfirmasi password tidak cocok")
+                    
+                    # Tampilkan error jika ada
+                    if error_messages:
+                        for err in error_messages:
+                            st.error(err)
+                    else:
+                        with st.spinner("Menyimpan perubahan..."):
+                            try:
+                                # Handle upload foto
+                                foto_url = user_data.get('foto_profil', '')
+                                if foto:
+                                    foto_url = handle_image_upload(
+                                        foto, 
+                                        f"Profil_{st.session_state.username}"
+                                    )
+                                
+                                # Update password jika diubah
+                                if password_baru:
+                                    hashed = bcrypt.hashpw(
+                                        password_baru.encode(), 
+                                        bcrypt.gensalt()
+                                    ).decode()
+                                    ws_user.update_cell(user_idx+2, 2, hashed)
+                                
+                                # Update data lainnya
+                                updates = [
+                                    (4, nama),       # nama_lengkap
+                                    (5, f"'{kontak}"), # no_hp (diawali ' untuk format nomor)
+                                    (6, deskripsi),   # deskripsi
+                                    (7, foto_url),    # foto_profil
+                                    (8, datetime.now().strftime("%Y-%m-%d %H:%M:%S")) # last_edit
+                                ]
+                                
+                                for col, value in updates:
+                                    ws_user.update_cell(user_idx+2, col, value)
+                                
+                                st.success("Profil berhasil diperbarui!")
+                                st.session_state.mode_edit = False
                                 time.sleep(1)
                                 st.rerun()
-        
-        with tab2:
-            st.markdown("### Tambah Kamar Baru")
-            with st.form("form_tambah_kamar"):
-                nama = st.text_input("Nama Kamar*", help="Wajib diisi")
-                harga = st.number_input("Harga*", min_value=0, value=1000000)
-                deskripsi = st.text_area("Deskripsi")
-                foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
-                
-                if st.form_submit_button("Simpan Kamar"):
-                    if not nama:
-                        st.error("Nama kamar wajib diisi")
-                    else:
-                        with tampilkan_loading("Menyimpan kamar..."):
-                            link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
-                            ws_kamar.append_row([
-                                nama, 
-                                "Kosong", 
-                                harga, 
-                                deskripsi, 
-                                link
-                            ])
-                            st.success("Kamar berhasil ditambahkan")
-                            time.sleep(1)
-                            st.rerun()
+                                
+                            except Exception as save_error:
+                                st.error(f"Gagal menyimpan perubahan: {str(save_error)}")
     
     except Exception as e:
-        st.error(f"Terjadi kesalahan: {str(e)}")
-
+        st.error(f"Terjadi kesalahan saat memuat profil: {str(e)}")
+        st.error("Silakan refresh halaman atau coba lagi nanti")
+        
 def manajemen():
     """Menu manajemen utama"""
     st.title("🗂️ Manajemen")
