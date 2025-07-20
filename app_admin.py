@@ -193,8 +193,84 @@ def manajemen_pembayaran():
 
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
-    st.info("Fitur ini sedang dalam pengembangan.")
+
+    booking_ws = connect_gsheet().worksheet("Booking")
+    user_ws = connect_gsheet().worksheet("User")
+    kamar_ws = connect_gsheet().worksheet("Kamar")
+
+    bookings = booking_ws.get_all_records()
+    kamar_data = kamar_ws.get_all_records()
+
+    for idx, b in enumerate(bookings):
+        st.write(f"{b['nama']} mengajukan kamar {b['kamar_dipilih']}")
+        if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
+            password = "12345678"
+            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], '', '', '', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+            for i, k in enumerate(kamar_data):
+                if k['Nama'] == b['kamar_dipilih']:
+                    kamar_ws.update_cell(i+2, 2, "Terisi")
+            booking_ws.delete_rows(idx+2)
+            st.success(f"{b['nama']} disetujui dengan password default 12345678.")
 
 def profil_saya():
-    st.title("👤 Profil Saya")
-    st.info("Fitur ini sedang dalam pengembangan.")
+    if 'profil_submenu' not in st.session_state:
+        st.session_state.profil_submenu = None
+
+    user_ws = connect_gsheet().worksheet("User")
+    users = user_ws.get_all_records()
+    idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
+    user_data = users[idx]
+
+    st.header("👤 Profil Saya")
+
+    col1, col2 = st.columns([1,3])
+
+    with col1:
+        if user_data.get('foto_profil'):
+            st.image(user_data['foto_profil'], width=100, caption="Foto Profil")
+
+    with col2:
+        st.markdown(f"""
+        <p><span class="label-align">Username:</span> {user_data['username']}</p>
+        <p><span class="label-align">Nama Lengkap:</span> {user_data.get('nama_lengkap','')}</p>
+        <p><span class="label-align">Nomor HP/Email:</span> {user_data.get('no_hp','')}</p>
+        <p><span class="label-align">Kamar:</span> {user_data.get('kamar','-')}</p>
+        <p><span class="label-align">Deskripsi Diri:</span> {user_data.get('deskripsi','')}</p>
+        """, unsafe_allow_html=True)
+
+    if st.button("Edit Profil"):
+        st.session_state.profil_submenu = "edit_profil"
+
+    if st.session_state.profil_submenu == "edit_profil":
+        st.subheader("Edit Profil")
+        last_edit_str = user_data.get('last_edit', '')
+        can_edit = True
+
+        if st.session_state.role != 'admin':
+            if last_edit_str:
+                last_edit = datetime.strptime(last_edit_str, "%Y-%m-%d %H:%M:%S")
+                if datetime.now() - last_edit < timedelta(days=7):
+                    can_edit = False
+
+        if can_edit:
+            nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
+            kontak = st.text_input("Nomor HP / Email", value=user_data.get('no_hp',''))
+            deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi',''))
+            foto = st.file_uploader("Foto Profil", type=["jpg","jpeg","png"])
+            new_password = st.text_input("Ganti Password (Opsional)", type="password")
+
+            if st.button("Simpan Perubahan"):
+                link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto_profil','')
+                user_ws.update_cell(idx+2, 4, nama)
+                user_ws.update_cell(idx+2, 5, f"'{kontak}")
+                user_ws.update_cell(idx+2, 6, deskripsi)
+                user_ws.update_cell(idx+2, 7, link)
+                user_ws.update_cell(idx+2, 8, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                if new_password:
+                    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                    user_ws.update_cell(idx+2, 2, hashed)
+                st.success("Profil berhasil diperbarui.")
+                st.session_state.profil_submenu = None
+        else:
+            st.warning("Edit profil hanya bisa dilakukan 1x dalam seminggu.")
