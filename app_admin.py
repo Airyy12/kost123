@@ -52,7 +52,7 @@ def admin_dashboard():
 
     st.markdown("### 📢 Komplain Terbaru")
     for k in komplain_data[-5:]:
-        st.write(f"{k['username']} : {k['komplain']} ({k['waktu']})")
+        st.write(f"{k['username']} : {k['isi_komplain']} ({k['waktu']})")
 
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
