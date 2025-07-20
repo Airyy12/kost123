@@ -7,3 +7,4 @@ Pillow
 bcrypt
 cloudinary
 Plotly
+pandas
