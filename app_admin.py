@@ -5,8 +5,17 @@ from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime
 import re
 
-# ---------- Fungsi Login & Registrasi ----------
+# ---------- Fungsi Utility ----------
+def pastikan_kolom(sheet, worksheet_name, kolom_dibutuhkan):
+    ws = sheet.worksheet(worksheet_name)
+    header = ws.row_values(1)
+    kolom_baru = [k for k in kolom_dibutuhkan if k not in header]
 
+    if kolom_baru:
+        header.extend(kolom_baru)
+        ws.update('A1', [header])
+
+# ---------- Fungsi Login & Registrasi ----------
 def cek_admin():
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
@@ -26,10 +35,9 @@ def registrasi_admin():
         else:
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
             user_ws = connect_gsheet().worksheet("User")
-            user_ws.append_row([username, hashed, "admin"])
+            user_ws.append_row([username, hashed, "admin", "", "", "Belum Bayar"])
             st.success("Admin berhasil dibuat. Silakan login.")
             st.rerun()
-
 
 def login(username, password):
     sheet = connect_gsheet().worksheet("User")
@@ -41,7 +49,6 @@ def login(username, password):
     return None
 
 # ---------- Fitur Admin ----------
-
 def kelola_kamar():
     st.subheader("➕ Tambah Kamar Baru")
 
@@ -70,6 +77,7 @@ def kelola_kamar():
         st.success("Kamar berhasil ditambahkan.")
         st.rerun()
 
+    # ---------- Daftar Kamar ----------
     st.markdown("---")
     st.subheader("🏠 Kelola Data Kamar")
 
@@ -99,6 +107,9 @@ def verifikasi_booking():
     booking_ws = sheet.worksheet("Booking")
     user_ws = sheet.worksheet("User")
     kamar_ws = sheet.worksheet("Kamar")
+
+    pastikan_kolom(sheet, "User", ["username", "password_hash", "role", "kamar", "kontak", "Status Pembayaran"])
+
     data = booking_ws.get_all_records()
     kamar_data = kamar_ws.get_all_records()
 
@@ -109,7 +120,7 @@ def verifikasi_booking():
         if st.button(f"Setujui {b['nama']}", key=f"setuju{idx}"):
             password = "12345678"
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            user_ws.append_row([b['nama'], hashed, "penyewa"])
+            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], b['no_hp_email'], "Belum Bayar"])
 
             for i, k in enumerate(kamar_data):
                 if k['Nama'] == b['kamar_dipilih']:
@@ -119,35 +130,25 @@ def verifikasi_booking():
             st.success(f"{b['nama']} disetujui. Password default: {password}")
             st.rerun()
 
-
-# ---------- Manajemen Penyewa ----------
-
 def manajemen_penyewa():
     st.subheader("👥 Manajemen Penyewa")
-    user_ws = connect_gsheet().worksheet("User")
-    data = user_ws.get_all_records()
+    sheet = connect_gsheet()
+    user_ws = sheet.worksheet("User")
+    user_data = user_ws.get_all_records()
 
-    for idx, p in enumerate(data):
-        if p['role'] == 'penyewa':
-            with st.expander(p['username']):
-                st.write(f"**Username:** {p['username']}")
-                new_password = st.text_input(f"Password Baru untuk {p['username']}", type="password", key=f"pw_{idx}")
-                if st.button(f"Update Password {p['username']}", key=f"update_{idx}"):
-                    if new_password:
-                        hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-                        user_ws.update_cell(idx+2, 2, hashed)
-                        st.success(f"Password {p['username']} berhasil diubah.")
-                        st.rerun()
-                    else:
-                        st.warning("Password baru tidak boleh kosong.")
-                if st.button(f"Hapus Penyewa {p['username']}", key=f"hapus_{idx}"):
-                    user_ws.delete_rows(idx+2)
-                    st.success(f"Penyewa {p['username']} dihapus.")
+    for idx, u in enumerate(user_data):
+        if u['role'] == 'penyewa':
+            label = f"{u['username']} ({u['kamar']})"
+            with st.expander(label):
+                st.write(f"**Kontak:** {u['kontak']}")
+                st.write(f"**Status Pembayaran:** {u['Status Pembayaran']}")
+                new_status = st.selectbox("Ubah Status Pembayaran", ["Belum Bayar", "Sudah Bayar"], index=0 if u['Status Pembayaran']=="Belum Bayar" else 1, key=f"status_{idx}")
+                if st.button(f"Update {u['username']}", key=f"update_{idx}"):
+                    user_ws.update_cell(idx+2, 6, new_status)
+                    st.success(f"Status pembayaran {u['username']} diperbarui.")
                     st.rerun()
 
-
-# ---------- Session State ----------
-
+# ---------- Session State Handling ----------
 st.set_page_config(page_title="Dashboard Kost123", layout="wide")
 st.title("📊 Dashboard Kost123")
 
@@ -155,6 +156,8 @@ if "login_status" not in st.session_state:
     st.session_state.login_status = False
     st.session_state.role = None
     st.session_state.username = ""
+
+# ---------- Main App ----------
 
 if not cek_admin():
     registrasi_admin()
