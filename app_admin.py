@@ -46,7 +46,7 @@ def admin_dashboard():
                 st.markdown(f"""
                 <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {row['waktu']}</strong><br>
-                    🧑 <strong>{row['nama']}</strong><br>
+                    🧑 <strong>{row['username']}</strong><br>
                     📝 {row['isi_komplain']}
                 </div>
                 """, unsafe_allow_html=True)
@@ -76,10 +76,10 @@ def admin_dashboard():
                 <div style="background-color:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {p['waktu']}</strong><br>
                     🧑 <strong>{p['username']}</strong> 
-                    💸 Total: Rp {p['jumlah_bayar']}
+                    💸 Total: Rp {p['nominal']}
                 </div>
                 """, unsafe_allow_html=True)
-
+                
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
 
