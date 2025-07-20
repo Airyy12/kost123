@@ -4,10 +4,7 @@ from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
 import bcrypt
 
-def run_penyewa():
-    st.sidebar.title("Penyewa Panel")
-    menu = st.sidebar.radio("Menu", ["Dashboard", "Pembayaran", "Komplain", "Profil Saya", "Logout"])
-
+def run_penyewa(menu):
     if menu == "Dashboard":
         penyewa_dashboard()
     elif menu == "Pembayaran":
@@ -17,9 +14,10 @@ def run_penyewa():
     elif menu == "Profil Saya":
         profil_saya()
     elif menu == "Logout":
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.experimental_rerun()
+        import streamlit as st
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
 def penyewa_dashboard():
     st.title("Dashboard Penyewa")
