@@ -1,8 +1,3 @@
-from penyewa_fitur.dashboard import penyewa_dashboard
-from penyewa_fitur.pembayaran import pembayaran
-from penyewa_fitur.komplain import komplain
-from user_fitur.profil import profil_saya
-
 import streamlit as st
 from datetime import datetime, timedelta
 from sheets import connect_gsheet
