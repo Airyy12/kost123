@@ -120,26 +120,79 @@ def manajemen_penyewa():
                     st.warning("Penyewa dihapus. Silakan refresh halaman.")
 
 def manajemen_laporan():
-    st.header("📄 Manajemen Laporan")
+    st.title("📢 Manajemen Komplain Interaktif")
 
-    sheet_names = ["User", "Pembayaran", "Komplain", "Booking"]
+    komplain_ws = connect_gsheet().worksheet("Komplain")
+    komplain_data = komplain_ws.get_all_records()
 
-    for sheet in sheet_names:
-        st.subheader(f"Laporan {sheet}")
+    if not komplain_data:
+        st.info("Belum ada data komplain.")
+        return
 
-        ws = connect_gsheet().worksheet(sheet)
-        data = ws.get_all_records()
-        df = pd.DataFrame(data)
+    for idx, k in enumerate(komplain_data):
+        username = k.get('username', '-')
+        isi_komplain = k.get('isi_komplain', '-')
+        waktu = k.get('waktu', '-')
+        link_foto = k.get('link_foto', '')
 
-        st.dataframe(df)
+        with st.expander(f"{username} - {waktu}"):
+            st.write(f"**Isi Komplain:** {isi_komplain}")
+            if link_foto:
+                st.image(link_foto, caption="Bukti Foto", use_column_width=True)
 
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label=f"Download {sheet}.csv",
-            data=csv,
-            file_name=f"{sheet.lower()}_laporan.csv",
-            mime='text/csv'
-        )
+            # Optional: Aksi tambahan jika perlu (hapus komplain, tandai selesai, dll)
+            # Contoh hapus komplain
+            if st.button("Hapus Komplain Ini", key=f"hapus_{idx}"):
+                komplain_ws.delete_rows(idx + 2)  # +2 karena ada header di baris 1
+                st.warning("Komplain telah dihapus. Silakan refresh halaman.")
+                st.experimental_rerun()
+def manajemen_pembayaran():
+    st.title("💸 Manajemen Pembayaran")
+
+    pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
+    pembayaran_data = pembayaran_ws.get_all_records()
+
+    if not pembayaran_data:
+        st.info("Belum ada data pembayaran.")
+        return
+
+    for idx, p in enumerate(pembayaran_data):
+        username = p.get('username', '-')
+        bulan = p.get('bulan', '-')
+        tahun = p.get('tahun', '-')
+        nominal = p.get('nominal', '-')
+        waktu = p.get('waktu', '-')
+        bukti_link = p.get('bukti', '')
+
+        with st.expander(f"{username} - {bulan} {tahun} - Rp{nominal}"):
+            st.write(f"**Nama:** {username}")
+            st.write(f"**Bulan/Tahun:** {bulan} / {tahun}")
+            st.write(f"**Nominal:** Rp {int(nominal):,}")
+            st.write(f"**Waktu Upload:** {waktu}")
+
+            if bukti_link:
+                st.image(bukti_link, caption="Bukti Pembayaran", use_column_width=True)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Verifikasi", key=f"verif_{idx}"):
+                    # Update status pembayaran di sheet User
+                    user_ws = connect_gsheet().worksheet("User")
+                    users = user_ws.get_all_records()
+                    user_idx = next((i for i, u in enumerate(users) if u['username'] == username), None)
+
+                    if user_idx is not None:
+                        user_ws.update_cell(user_idx+2, 9, "Lunas")  # Kolom I (status pembayaran)
+                        st.success(f"Pembayaran {username} berhasil diverifikasi.")
+
+                    pembayaran_ws.delete_rows(idx+2)
+                    st.experimental_rerun()
+
+            with col2:
+                if st.button("❌ Tolak", key=f"tolak_{idx}"):
+                    pembayaran_ws.delete_rows(idx+2)
+                    st.warning(f"Pembayaran dari {username} telah ditolak.")
+                    st.experimental_rerun()
 
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
