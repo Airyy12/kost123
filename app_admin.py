@@ -46,7 +46,7 @@ def admin_dashboard():
                 st.markdown(f"""
                 <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {row['waktu']}</strong><br>
-                    🧑 <strong>{row['nama']}</strong><br>
+                    🧑 <strong>{row['username']}</strong><br>
                     📝 {row['komplain']}
                 </div>
                 """, unsafe_allow_html=True)
