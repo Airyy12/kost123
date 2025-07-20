@@ -27,17 +27,62 @@ from datetime import datetime
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
 
-    # Load data dengan error handling
+    # Load semua data yang diperlukan
     try:
+        df_kamar = load_sheet_data('kamar')
+        df_user = load_sheet_data('user')
         df_komplain = load_sheet_data('komplain')
         df_booking = load_sheet_data('booking')
         df_pembayaran = load_sheet_data('pembayaran')
-        
     except Exception as e:
         st.error(f"Gagal memuat data: {str(e)}")
         return
 
-    # Custom CSS untuk card
+    # ========== STATISTIK KAMAR ==========
+    st.markdown("## 📊 Statistik Kamar")
+    
+    # Hitung statistik
+    total_kamar = len(df_kamar)
+    kamar_kosong = len(df_kamar[df_kamar['Status'] == 'Kosong'])
+    kamar_terisi = len(df_kamar[df_kamar['Status'] == 'Terisi'])
+    penyewa_aktif = len(df_user[(df_user['role'] == 'penyewa') & (df_user['status_pembayaran'] == 'Lunas')])
+
+    # Tampilkan dalam columns
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="info-card" style="text-align: center;">
+            <h3>🏘️ Total Kamar</h3>
+            <h2 style="color: #42A5F5;">{total_kamar}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="info-card" style="text-align: center;">
+            <h3>🛏️ Kamar Kosong</h3>
+            <h2 style="color: #66BB6A;">{kamar_kosong}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="info-card" style="text-align: center;">
+            <h3>🧑 Kamar Terisi</h3>
+            <h2 style="color: #FFA726;">{kamar_terisi}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="info-card" style="text-align: center;">
+            <h3>✅ Penyewa Aktif</h3>
+            <h2 style="color: #AB47BC;">{penyewa_aktif}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ========== CUSTOM CSS UNTUK CARD ==========
     st.markdown("""
     <style>
     .komplain-card {
@@ -81,8 +126,8 @@ def admin_dashboard():
     </style>
     """, unsafe_allow_html=True)
 
-    # Section 1: Komplain Terbaru
-    st.markdown("### 🛠️ Komplain Terbaru")
+    # ========== KOMPLAIN TERBARU ==========
+    st.markdown("## 🛠️ Komplain Terbaru")
     if df_komplain.empty:
         st.info("Belum ada komplain.")
     else:
@@ -96,8 +141,8 @@ def admin_dashboard():
             </div>
             """, unsafe_allow_html=True)
 
-    # Section 2: Booking Terbaru
-    st.markdown("### 📝 Booking Terbaru")
+    # ========== BOOKING TERBARU ==========
+    st.markdown("## 📝 Booking Terbaru")
     if df_booking.empty:
         st.info("Belum ada data booking.")
     else:
@@ -111,8 +156,8 @@ def admin_dashboard():
             </div>
             """, unsafe_allow_html=True)
 
-    # Section 3: Pembayaran Terbaru
-    st.markdown("### 💵 Pembayaran Terbaru")
+    # ========== PEMBAYARAN TERBARU ==========
+    st.markdown("## 💵 Pembayaran Terbaru")
     if df_pembayaran.empty:
         st.info("Belum ada data pembayaran.")
     else:
