@@ -184,7 +184,7 @@ def profil_saya():
             if st.button("Simpan Perubahan"):
                 link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto_profil','')
                 user_ws.update_cell(idx+2, 4, nama)
-                user_ws.update_cell(idx+2, 5, kontak)
+                user_ws.update_cell(idx+2, 5, f"'{kontak}")  # Tambah ' agar 0 tidak hilang
                 user_ws.update_cell(idx+2, 7, link)
                 user_ws.update_cell(idx+2, 8, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 if new_password:
@@ -194,6 +194,80 @@ def profil_saya():
                 st.session_state.submenu = None
         else:
             st.warning("Edit profil hanya bisa dilakukan 1x dalam seminggu.")
+
+# ---------- Komplain ----------
+def komplain():
+    st.title("📢 Komplain")
+    isi = st.text_area("Tulis Komplain Anda")
+    bukti = st.file_uploader("Upload Foto (Opsional)", type=["jpg","jpeg","png"])
+    if st.button("Kirim Komplain"):
+        link = upload_to_cloudinary(bukti, f"Komplain_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}") if bukti else ""
+        komplain_ws = connect_gsheet().worksheet("Komplain")
+        komplain_ws.append_row([st.session_state.username, isi, link, str(datetime.now())])
+        st.success("Komplain berhasil dikirim.")
+
+# ---------- Pembayaran ----------
+def pembayaran():
+    st.title("💸 Pembayaran Kost")
+    bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
+    tahun = st.text_input("Tahun", str(datetime.now().year))
+    bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg","jpeg","png"])
+    if st.button("Kirim Bukti"):
+        link = upload_to_cloudinary(bukti, f"Bayar_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}")
+        bayar_ws = connect_gsheet().worksheet("Pembayaran")
+        bayar_ws.append_row([st.session_state.username, bulan, tahun, link, str(datetime.now())])
+        st.success("Bukti pembayaran berhasil dikirim.")
+
+# ---------- Admin Dashboard ----------
+def admin_dashboard():
+    st.title("📊 Dashboard Admin")
+    st.markdown("<div class='info-card'>Selamat datang di Admin Panel Kost123.</div>", unsafe_allow_html=True)
+
+# ---------- Kelola Kamar ----------
+def kelola_kamar():
+    st.title("🛠️ Kelola Kamar")
+    kamar_ws = connect_gsheet().worksheet("Kamar")
+    data = kamar_ws.get_all_records()
+    for k in data:
+        st.markdown(f"<div class='info-card'>{k['Nama']} - {k['Status']} - Rp{k['Harga']}</div>", unsafe_allow_html=True)
+
+    nama = st.text_input("Nama Kamar")
+    harga = st.number_input("Harga", min_value=0)
+    deskripsi = st.text_area("Deskripsi")
+    foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
+    if st.button("Tambah Kamar"):
+        link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
+        kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
+        st.success("Kamar berhasil ditambahkan.")
+
+# ---------- Verifikasi Booking ----------
+def verifikasi_booking():
+    st.title("✅ Verifikasi Booking")
+    booking_ws = connect_gsheet().worksheet("Booking")
+    user_ws = connect_gsheet().worksheet("User")
+    kamar_ws = connect_gsheet().worksheet("Kamar")
+    bookings = booking_ws.get_all_records()
+    kamar_data = kamar_ws.get_all_records()
+    for idx, b in enumerate(bookings):
+        st.write(f"{b['nama']} mengajukan kamar {b['kamar_dipilih']}")
+        if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
+            password = "12345678"
+            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], '', '', '', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+            for i, k in enumerate(kamar_data):
+                if k['Nama'] == b['kamar_dipilih']:
+                    kamar_ws.update_cell(i+2, 2, "Terisi")
+            booking_ws.delete_rows(idx+2)
+            st.success(f"{b['nama']} disetujui dengan password default 12345678.")
+
+# ---------- Manajemen Penyewa ----------
+def manajemen_penyewa():
+    st.title("👥 Manajemen Penyewa")
+    user_ws = connect_gsheet().worksheet("User")
+    users = user_ws.get_all_records()
+    for u in users:
+        if u['role'] == 'penyewa':
+            st.markdown(f"<div class='info-card'>{u['username']} - {u.get('kamar','-')}</div>", unsafe_allow_html=True)
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
@@ -207,7 +281,12 @@ else:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
     elif st.session_state.role == "admin":
-        if menu == "Dashboard Admin": st.write("Admin Dashboard")
+        if menu == "Dashboard Admin": admin_dashboard()
+        elif menu == "Kelola Kamar": kelola_kamar()
+        elif menu == "Verifikasi Booking": verifikasi_booking()
+        elif menu == "Manajemen Penyewa": manajemen_penyewa()
     else:
         if menu == "Dashboard": penyewa_dashboard()
+        elif menu == "Pembayaran": pembayaran()
+        elif menu == "Komplain": komplain()
         elif menu == "Profil Saya": profil_saya()
