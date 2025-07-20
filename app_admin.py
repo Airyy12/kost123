@@ -4,18 +4,18 @@ from datetime import datetime
 from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
 
-# ---------- Page Config ----------
 st.set_page_config(page_title="Kost123 Dashboard", layout="wide")
 
-# ---------- Custom CSS for Professional UI ----------
+# ---------- Custom CSS ----------
 st.markdown("""
 <style>
 body {
-    background-color: #f5f5f5;
+    background-color: #1e1e1e;
+    color: #f0f0f0;
     font-family: 'Segoe UI', sans-serif;
 }
 [data-testid="stSidebar"] > div:first-child {
-    background: linear-gradient(135deg, #232526, #414345);
+    background: linear-gradient(145deg, #2c2c2c, #3a3a3a);
     padding: 25px;
     border-radius: 12px;
 }
@@ -43,6 +43,12 @@ body {
     font-weight: bold;
     box-shadow: inset 0 0 5px #00000055;
 }
+.info-card {
+    background: rgba(150,0,0,0.3);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
 .stButton>button {
     background-color: #4CAF50;
     color: white;
@@ -58,18 +64,18 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Session State Initialization ----------
+# ---------- Session Init ----------
 if 'login_status' not in st.session_state:
     st.session_state.login_status = False
     st.session_state.role = None
     st.session_state.username = ""
     st.session_state.menu = None
 
-# ---------- Sidebar Menu ----------
-with st.sidebar:
-    st.markdown('<div class="sidebar-title">🏠 Kost123 Panel</div>', unsafe_allow_html=True)
+# ---------- Sidebar ----------
+def sidebar_menu():
+    with st.sidebar:
+        st.markdown('<div class="sidebar-title">🏠 Kost123 Panel</div>', unsafe_allow_html=True)
 
-    if st.session_state.role:
         if st.session_state.role == "admin":
             menu_options = [
                 ("Dashboard Admin", "📊 Dashboard Admin"),
@@ -88,14 +94,13 @@ with st.sidebar:
             ]
 
         for key, label in menu_options:
-            button_style = "menu-item"
+            style = "menu-item"
             if st.session_state.menu == key:
-                button_style += " menu-selected"
+                style += " menu-selected"
             if st.button(label, key=key):
                 st.session_state.menu = key
-                st.experimental_rerun()
 
-# ---------- Login Page ----------
+# ---------- Login ----------
 def login_page():
     st.title("🔐 Login Kost123")
     username = st.text_input("Username")
@@ -108,21 +113,24 @@ def login_page():
                 st.session_state.login_status = True
                 st.session_state.username = username
                 st.session_state.role = u['role']
-                if not st.session_state.menu:
-                    st.session_state.menu = "Dashboard Admin" if u['role']=="admin" else "Dashboard"
-                st.experimental_rerun()
-        else:
-            st.error("Username atau Password salah.")
+                st.session_state.menu = "Dashboard Admin" if u['role']=="admin" else "Dashboard"
+                return
+        st.error("Username atau Password salah.")
 
-# ---------- Penyewa Features ----------
+# ---------- Penyewa ----------
 def penyewa_dashboard():
     st.title("📊 Dashboard Penyewa")
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
     user_data = next(u for u in users if u['username']==st.session_state.username)
-    st.write(f"**Nama:** {user_data.get('nama_lengkap', user_data['username'])}")
-    st.write(f"**Kamar:** {user_data.get('kamar','Belum Terdaftar')}")
-    st.write(f"**Status Pembayaran:** {user_data.get('Status Pembayaran','Belum Ada Data')}")
+
+    st.markdown(f"""
+    <div class="info-card">
+        <h4>Nama: {user_data.get('nama_lengkap', user_data['username'])}</h4>
+        <p>Kamar: {user_data.get('kamar','Belum Terdaftar')}</p>
+        <p>Status Pembayaran: {user_data.get('Status Pembayaran','Belum Ada Data')}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 def pembayaran():
     st.title("💸 Pembayaran Kost")
@@ -160,20 +168,18 @@ def profil_saya():
         user_ws.update(f"E{idx+2}", link)
         st.success("Profil berhasil diperbarui.")
 
-# ---------- Admin Features ----------
+# ---------- Admin ----------
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
-    st.write("Selamat datang di Admin Panel Kost123.")
+    st.markdown("<div class='info-card'>Selamat datang di Admin Panel Kost123.</div>", unsafe_allow_html=True)
 
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
     kamar_ws = connect_gsheet().worksheet("Kamar")
     data = kamar_ws.get_all_records()
-    st.subheader("Daftar Kamar")
     for k in data:
-        st.write(f"{k['Nama']} - {k['Status']} - Rp{k['Harga']}")
-    st.markdown("---")
-    st.subheader("Tambah Kamar Baru")
+        st.markdown(f"<div class='info-card'>{k['Nama']} - {k['Status']} - Rp{k['Harga']}</div>", unsafe_allow_html=True)
+
     nama = st.text_input("Nama Kamar")
     harga = st.number_input("Harga", min_value=0)
     deskripsi = st.text_area("Deskripsi")
@@ -208,34 +214,26 @@ def manajemen_penyewa():
     users = user_ws.get_all_records()
     for u in users:
         if u['role'] == 'penyewa':
-            st.write(f"{u['username']} - {u.get('kamar','-')}")
+            st.markdown(f"<div class='info-card'>{u['username']} - {u.get('kamar','-')}</div>", unsafe_allow_html=True)
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
     login_page()
 else:
+    sidebar_menu()
+
     menu = st.session_state.menu
-    if st.session_state.role == "admin":
-        if menu == "Dashboard Admin":
-            admin_dashboard()
-        elif menu == "Kelola Kamar":
-            kelola_kamar()
-        elif menu == "Verifikasi Booking":
-            verifikasi_booking()
-        elif menu == "Manajemen Penyewa":
-            manajemen_penyewa()
-        elif menu == "Logout":
-            st.session_state.clear()
-            st.experimental_rerun()
+
+    if menu == "Logout":
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+    elif st.session_state.role == "admin":
+        if menu == "Dashboard Admin": admin_dashboard()
+        elif menu == "Kelola Kamar": kelola_kamar()
+        elif menu == "Verifikasi Booking": verifikasi_booking()
+        elif menu == "Manajemen Penyewa": manajemen_penyewa()
     else:
-        if menu == "Dashboard":
-            penyewa_dashboard()
-        elif menu == "Pembayaran":
-            pembayaran()
-        elif menu == "Komplain":
-            komplain()
-        elif menu == "Profil Saya":
-            profil_saya()
-        elif menu == "Logout":
-            st.session_state.clear()
-            st.experimental_rerun()
+        if menu == "Dashboard": penyewa_dashboard()
+        elif menu == "Pembayaran": pembayaran()
+        elif menu == "Komplain": komplain()
+        elif menu == "Profil Saya": profil_saya()
