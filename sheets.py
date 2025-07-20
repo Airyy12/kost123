@@ -11,3 +11,10 @@ def connect_gsheet():
     client = gspread.authorize(creds)
     sheet = client.open_by_key(st.secrets["gsheet_id"])
     return sheet
+
+# Di dalam sheet.py
+def load_sheet_data(sheet_name):
+    worksheet = connect_gsheet().worksheet(sheet_name.capitalize())
+    data = worksheet.get_all_records()
+    return pd.DataFrame(data)
+
