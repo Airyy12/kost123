@@ -50,6 +50,14 @@ body {
     margin-bottom: 20px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
+.profile-section {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.profile-text {
+    margin-left: 20px;
+}
 .stButton>button {
     background-color: #3d3d3d;
     color: white;
@@ -126,21 +134,32 @@ def penyewa_dashboard():
     users = user_ws.get_all_records()
     user_data = next(u for u in users if u['username']==st.session_state.username)
 
-    st.title(f"Selamat Datang, {user_data.get('nama_lengkap', user_data['username'])}")
+    st.title("Dashboard Penyewa")
 
-    if user_data.get('foto_profil'):
-        st.image(user_data['foto_profil'], width=100, caption="Foto Profil", output_format="JPEG", use_column_width=False, clamp=True)
-
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([1,3])
 
     with col1:
+        if user_data.get('foto_profil'):
+            st.image(user_data['foto_profil'], width=100, caption="Foto Profil")
+
+    with col2:
+        st.markdown(f"""
+        <div class="profile-text">
+            <h3>Selamat Datang, {user_data.get('nama_lengkap', user_data['username'])}</h3>
+            <p>{user_data.get('deskripsi', 'Belum ada deskripsi diri.')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    col3, col4 = st.columns(2)
+
+    with col3:
         st.markdown(f"""
         <div class="info-card">
             <b>Nomor Kamar:</b><br>{user_data.get('kamar','Belum Terdaftar')}
         </div>
         """, unsafe_allow_html=True)
 
-    with col2:
+    with col4:
         st.markdown(f"""
         <div class="info-card">
             <b>Status Pembayaran:</b><br>{user_data.get('Status Pembayaran','Belum Ada Data')}
@@ -160,6 +179,7 @@ def profil_saya():
     st.write(f"**Nama Lengkap:** {user_data.get('nama_lengkap','')}")
     st.write(f"**Nomor HP/Email:** {user_data.get('no_hp','')}")
     st.write(f"**Kamar:** {user_data.get('kamar','-')}")
+    st.write(f"**Deskripsi Diri:** {user_data.get('deskripsi','')}")
 
     if st.button("Edit Profil"):
         st.session_state.submenu = "edit_profil"
@@ -178,13 +198,15 @@ def profil_saya():
         if can_edit:
             nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
             kontak = st.text_input("Nomor HP / Email", value=user_data.get('no_hp',''))
+            deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi',''))
             foto = st.file_uploader("Foto Profil", type=["jpg","jpeg","png"])
             new_password = st.text_input("Ganti Password (Opsional)", type="password")
 
             if st.button("Simpan Perubahan"):
                 link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto_profil','')
                 user_ws.update_cell(idx+2, 4, nama)
-                user_ws.update_cell(idx+2, 5, f"'{kontak}")  # Tambah ' agar 0 tidak hilang
+                user_ws.update_cell(idx+2, 5, f"'{kontak}")
+                user_ws.update_cell(idx+2, 6, deskripsi)
                 user_ws.update_cell(idx+2, 7, link)
                 user_ws.update_cell(idx+2, 8, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 if new_password:
