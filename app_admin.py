@@ -9,18 +9,16 @@ def run_admin(menu):
         admin_dashboard()
     elif menu == "Kelola Kamar":
         kelola_kamar()
-    elif menu == "Manajemen Penyewa":
-        manajemen_penyewa()
+    elif menu == "Manajemen":
+        manajemen()
     elif menu == "Verifikasi Booking":
         verifikasi_booking()
     elif menu == "Profil Saya":
         profil_saya()
     elif menu == "Logout":
-        import streamlit as st
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
-
 
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
@@ -73,6 +71,39 @@ def kelola_kamar():
         link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
         kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
         st.success("Kamar berhasil ditambahkan.")
+
+def manajemen():
+    st.title("🗂️ Manajemen")
+
+    submenu = st.selectbox("Pilih Submenu", ["Manajemen Penyewa", "Manajemen Laporan"])
+
+    if submenu == "Manajemen Penyewa":
+        manajemen_penyewa()
+    elif submenu == "Manajemen Laporan":
+        manajemen_laporan()
+import pandas as pd
+
+def manajemen_laporan():
+    st.header("📄 Manajemen Laporan")
+
+    sheet_names = ["User", "Pembayaran", "Komplain", "Booking"]
+
+    for sheet in sheet_names:
+        st.subheader(f"Laporan {sheet}")
+
+        ws = connect_gsheet().worksheet(sheet)
+        data = ws.get_all_records()
+        df = pd.DataFrame(data)
+
+        st.dataframe(df)
+
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"Download {sheet}.csv",
+            data=csv,
+            file_name=f"{sheet.lower()}_laporan.csv",
+            mime='text/csv'
+        )
 
 def manajemen_penyewa():
     st.title("👥 Manajemen Penyewa")
