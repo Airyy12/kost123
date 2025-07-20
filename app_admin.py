@@ -13,6 +13,16 @@ def get_current_month():
 def get_current_year():
     return datetime.now().year
 
+# ---------- Fungsi Cek Kolom ----------
+def ensure_status_pembayaran_column():
+    user_ws = connect_gsheet().worksheet("User")
+    header = user_ws.row_values(1)
+    if "Status Pembayaran" not in header:
+        user_ws.update_cell(1, len(header)+1, "Status Pembayaran")
+        users = user_ws.get_all_records()
+        for idx, _ in enumerate(users):
+            user_ws.update_cell(idx+2, len(header)+1, "Belum Lunas")
+
 # ---------- Fungsi Login & Registrasi ----------
 def cek_admin():
     user_ws = connect_gsheet().worksheet("User")
@@ -125,6 +135,7 @@ def verifikasi_booking():
 
 def manajemen_penyewa():
     st.subheader("👥 Manajemen Penyewa")
+    ensure_status_pembayaran_column()
 
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
@@ -148,19 +159,23 @@ def manajemen_penyewa():
 # ---------- Fitur Penyewa ----------
 def fitur_penyewa(username):
     st.header(f"Selamat Datang, {username}")
+    ensure_status_pembayaran_column()
 
     menu = st.sidebar.selectbox("Menu Penyewa", ["Upload Pembayaran", "Komplain", "Cek Status Pembayaran"])
 
     if menu == "Upload Pembayaran":
         bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg", "jpeg", "png"])
-        bulan = st.text_input("Bulan & Tahun Pembayaran (Contoh: Juli 2025)")
+        bulan = st.selectbox("Pilih Bulan", list(calendar.month_name)[1:])
+        tahun = st.text_input("Tahun (contoh: 2025)")
+
         if st.button("Kirim Bukti"):
-            if not bulan:
-                st.warning("Mohon isi keterangan bulan/tahun pembayaran.")
+            if not tahun or not tahun.isdigit():
+                st.warning("Mohon isi tahun dengan angka.")
             else:
+                bulan_tahun = f"{bulan} {tahun}"
                 link = upload_to_cloudinary(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
                 bayar_ws = connect_gsheet().worksheet("Pembayaran")
-                bayar_ws.append_row([username, link, bulan, str(datetime.now())])
+                bayar_ws.append_row([username, link, bulan_tahun, str(datetime.now())])
                 st.success("Bukti pembayaran berhasil dikirim.")
 
     if menu == "Komplain":
