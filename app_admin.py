@@ -34,10 +34,9 @@ def login(username, password):
     sheet = connect_gsheet().worksheet("User")
     users = sheet.get_all_records()
     for u in users:
-        if 'username' in u and 'password_hash' in u and 'role' in u:
-            if u['username'] == username:
-                if bcrypt.checkpw(password.encode(), u['password_hash'].encode()):
-                    return u['role']
+        if u['username'] == username:
+            if bcrypt.checkpw(password.encode(), u['password_hash'].encode()):
+                return u['role']
     return None
 
 # ---------- Fitur Admin ----------
@@ -81,7 +80,7 @@ def verifikasi_booking():
 
     for idx, b in enumerate(data):
         st.write(f"**{b['nama']}** mengajukan kamar **{b['kamar_dipilih']}**")
-        st.image(b['link_ktp'], width=200)
+        st.write(f"Kontak: {b['no_hp_email']}")
 
         if st.button(f"Setujui {b['nama']}", key=f"setuju{idx}"):
             password = "12345678"  # Default password
@@ -106,11 +105,15 @@ def fitur_penyewa(username):
 
     if menu == "Upload Pembayaran":
         bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg", "jpeg", "png"])
+        bulan = st.text_input("Bulan & Tahun Pembayaran (Contoh: Juli 2025 / Juli-Agustus 2025)")
         if st.button("Kirim Bukti"):
-            link = upload_to_drive(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg")
-            bayar_ws = connect_gsheet().worksheet("Pembayaran")
-            bayar_ws.append_row([username, link, str(datetime.now())])
-            st.success("Bukti pembayaran berhasil dikirim.")
+            if not bulan:
+                st.warning("Mohon isi keterangan bulan/tahun pembayaran.")
+            else:
+                link = upload_to_drive(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg")
+                bayar_ws = connect_gsheet().worksheet("Pembayaran")
+                bayar_ws.append_row([username, link, bulan, str(datetime.now())])
+                st.success("Bukti pembayaran berhasil dikirim.")
 
     if menu == "Komplain":
         isi = st.text_area("Tulis Komplain Anda")
@@ -158,7 +161,6 @@ else:
         elif st.session_state.role == "penyewa":
             fitur_penyewa(st.session_state.username)
 
-        # Tombol Logout
         if st.sidebar.button("Logout"):
             st.session_state.login_status = False
             st.session_state.role = None
