@@ -120,31 +120,42 @@ def manajemen_penyewa():
                     st.experimental_rerun()
 
 def manajemen_komplain():
-    st.title("📢 Manajemen Komplain Interaktif")
+    st.subheader("📢 Manajemen Komplain")
 
-    komplain_ws = connect_gsheet().worksheet("Komplain")
-    komplain_data = komplain_ws.get_all_records()
+    df_komplain = read_sheet('Komplain')
 
-    if not komplain_data:
+    if df_komplain.empty:
         st.info("Belum ada data komplain.")
         return
 
-    for idx, k in enumerate(komplain_data):
-        username = k.get('username', '-')
-        isi_komplain = k.get('isi_komplain', '-')
-        waktu = k.get('waktu', '-')
-        link_foto = k.get('link_foto', '')
+    # Pastikan kolom 'status' ada. Kalau tidak ada, buat kolom sementara 'status' kosong
+    if 'status' not in df_komplain.columns:
+        df_komplain['status'] = ""
 
-        with st.expander(f"{username} - {waktu}"):
-            st.write(f"**Isi Komplain:** {isi_komplain}")
-            if link_foto:
-                st.image(link_foto, caption="Bukti Foto", use_container_width=True)
+    # Filter hanya yang belum selesai
+    df_belum_selesai = df_komplain[df_komplain['status'].str.lower() != 'selesai']
 
-            if st.button("Hapus Komplain Ini", key=f"hapus_{idx}"):
-                komplain_ws.delete_rows(idx + 2)
-                st.warning("Komplain telah dihapus.")
+    if df_belum_selesai.empty:
+        st.success("Tidak ada komplain yang belum diselesaikan.")
+        return
+
+    st.write("### Komplain Belum Diselesaikan")
+
+    for idx, row in df_belum_selesai.iterrows():
+        with st.expander(f"👤 {row['username']} | 🕒 {row['waktu']}"):
+            st.write(f"**Isi Komplain:** {row['isi_komplain']}")
+            if row.get('link_foto'):
+                st.image(row['link_foto'], width=300, caption="Bukti Komplain")
+            else:
+                st.caption("Tidak ada foto bukti")
+
+            # Tombol untuk menandai komplain sebagai selesai
+            if st.button(f"✅ Tandai Selesai - {row['username']}", key=f"selesai_{idx}"):
+                df_komplain.at[idx, 'status'] = 'selesai'
+                update_sheet('Komplain', df_komplain)
+                st.success("Komplain ditandai sebagai selesai.")
                 st.experimental_rerun()
-
+                
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
 
