@@ -126,53 +126,59 @@ def admin_dashboard():
     </style>
     """, unsafe_allow_html=True)
 
-    # ========== KOMPLAIN TERBARU ==========
-    st.markdown("## 🛠️ Komplain Terbaru")
-    if df_komplain.empty:
-        st.info("Belum ada komplain.")
-    else:
-        komplain_terbaru = df_komplain.sort_values("waktu", ascending=False).head(5)
-        for _, row in komplain_terbaru.iterrows():
-            st.markdown(f"""
-            <div class="komplain-card">
-                <div class="card-title">🧑 {row.get('username', 'N/A')}</div>
-                <div class="card-time">📅 {row.get('waktu', '')}</div>
-                <div class="card-content">📝 {row.get('isi_komplain', '')}</div>
-            </div>
-            """, unsafe_allow_html=True)
+    # Membagi layout menjadi 3 kolom untuk menampilkan semua card dalam satu view
+    col1, col2, col3 = st.columns(3)
 
-    # ========== BOOKING TERBARU ==========
-    st.markdown("## 📝 Booking Terbaru")
-    if df_booking.empty:
-        st.info("Belum ada data booking.")
-    else:
-        booking_terbaru = df_booking.sort_values("waktu_booking", ascending=False).head(5)
-        for _, row in booking_terbaru.iterrows():
-            st.markdown(f"""
-            <div class="booking-card">
-                <div class="card-title">🧑 {row.get('nama', 'N/A')}</div>
-                <div class="card-time">📅 {row.get('waktu_booking', '')}</div>
-                <div class="card-content">🏠 Kamar: {row.get('kamar_dipilih', '')}</div>
-            </div>
-            """, unsafe_allow_html=True)
+    with col1:
+        # ========== KOMPLAIN TERBARU ==========
+        st.markdown("### 🛠️ Komplain Terbaru")
+        if df_komplain.empty:
+            st.info("Belum ada komplain.")
+        else:
+            komplain_terbaru = df_komplain.sort_values("waktu", ascending=False).head(2)
+            for _, row in komplain_terbaru.iterrows():
+                st.markdown(f"""
+                <div class="komplain-card">
+                    <div class="card-title">🧑 {row.get('username', 'N/A')}</div>
+                    <div class="card-time">📅 {row.get('waktu', '')}</div>
+                    <div class="card-content">📝 {row.get('isi_komplain', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-    # ========== PEMBAYARAN TERBARU ==========
-    st.markdown("## 💵 Pembayaran Terbaru")
-    if df_pembayaran.empty:
-        st.info("Belum ada data pembayaran.")
-    else:
-        pembayaran_terbaru = df_pembayaran.sort_values("waktu", ascending=False).head(5)
-        for _, row in pembayaran_terbaru.iterrows():
-            nominal = int(row.get('nominal', 0))
-            st.markdown(f"""
-            <div class="pembayaran-card">
-                <div class="card-title">🧑 {row.get('username', 'N/A')}</div>
-                <div class="card-time">📅 {row.get('waktu', '')}</div>
-                <div class="card-content">💸 Rp {nominal:,}</div>
-                <div class="card-content">🗓️ {row.get('bulan', '')} {row.get('tahun', '')}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
+    with col2:
+        # ========== BOOKING TERBARU ==========
+        st.markdown("### 📝 Booking Terbaru")
+        if df_booking.empty:
+            st.info("Belum ada data booking.")
+        else:
+            booking_terbaru = df_booking.sort_values("waktu_booking", ascending=False).head(2)
+            for _, row in booking_terbaru.iterrows():
+                st.markdown(f"""
+                <div class="booking-card">
+                    <div class="card-title">🧑 {row.get('nama', 'N/A')}</div>
+                    <div class="card-time">📅 {row.get('waktu_booking', '')}</div>
+                    <div class="card-content">🏠 Kamar: {row.get('kamar_dipilih', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    with col3:
+        # ========== PEMBAYARAN TERBARU ==========
+        st.markdown("### 💵 Pembayaran Terbaru")
+        if df_pembayaran.empty:
+            st.info("Belum ada data pembayaran.")
+        else:
+            pembayaran_terbaru = df_pembayaran.sort_values("waktu", ascending=False).head(2)
+            for _, row in pembayaran_terbaru.iterrows():
+                nominal = int(row.get('nominal', 0))
+                st.markdown(f"""
+                <div class="pembayaran-card">
+                    <div class="card-title">🧑 {row.get('username', 'N/A')}</div>
+                    <div class="card-time">📅 {row.get('waktu', '')}</div>
+                    <div class="card-content">💸 Rp {nominal:,}</div>
+                    <div class="card-content">🗓️ {row.get('bulan', '')} {row.get('tahun', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
 
