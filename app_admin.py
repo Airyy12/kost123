@@ -41,28 +41,6 @@ def login(username, password):
 
 # ---------- Fitur Admin ----------
 def kelola_kamar():
-    st.subheader("🏠 Kelola Data Kamar")
-    kamar_ws = connect_gsheet().worksheet("Kamar")
-    data = kamar_ws.get_all_records()
-
-    for idx, k in enumerate(data):
-        label = f"**{k['Nama']}** - Rp{k['Harga']}"
-        with st.expander(label):
-            st.write(f"**Status:** {k['Status']}")
-            st.text(k['Deskripsi'])
-            if k['Link Foto']:
-                try:
-                    st.image(k['Link Foto'], width=300)
-                except Exception:
-                    st.warning("Gagal menampilkan foto.")
-            else:
-                st.info("Tidak ada foto.")
-            if st.button(f"Hapus {k['Nama']}", key=f"hapus_{idx}"):
-                kamar_ws.delete_rows(idx + 2)
-                st.success(f"Kamar {k['Nama']} dihapus.")
-                st.rerun()
-
-    st.markdown("---")
     st.subheader("➕ Tambah Kamar Baru")
 
     nama = st.text_input("Nama Kamar Baru")
@@ -85,10 +63,34 @@ def kelola_kamar():
                 st.error(f"Gagal upload foto: {e}")
                 return
 
+        kamar_ws = connect_gsheet().worksheet("Kamar")
         kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link_foto])
         st.success("Kamar berhasil ditambahkan.")
         st.rerun()
 
+    # ---------- Daftar Kamar ----------
+    st.markdown("---")
+    st.subheader("🏠 Kelola Data Kamar")
+
+    kamar_ws = connect_gsheet().worksheet("Kamar")
+    data = kamar_ws.get_all_records()
+
+    for idx, k in enumerate(data):
+        label = f"**{k['Nama']}** - Rp{k['Harga']}"
+        with st.expander(label):
+            st.write(f"**Status:** {k['Status']}")
+            st.text(k['Deskripsi'])
+            if k['Link Foto']:
+                try:
+                    st.image(k['Link Foto'], width=300)
+                except Exception:
+                    st.warning("Gagal menampilkan foto.")
+            else:
+                st.info("Tidak ada foto.")
+            if st.button(f"Hapus {k['Nama']}", key=f"hapus_{idx}"):
+                kamar_ws.delete_rows(idx + 2)
+                st.success(f"Kamar {k['Nama']} dihapus.")
+                st.rerun()
 def verifikasi_booking():
     st.subheader("📄 Verifikasi Booking")
     sheet = connect_gsheet()
