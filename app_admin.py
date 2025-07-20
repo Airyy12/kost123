@@ -180,25 +180,141 @@ def admin_dashboard():
                 """, unsafe_allow_html=True)
 
 def kelola_kamar():
-    st.title("🛠️ Kelola Kamar")
+    st.title("🛏️ Kelola Kamar")
+    
+    # Load data kamar
+    try:
+        kamar_ws = connect_gsheet().worksheet("Kamar")
+        kamar_data = kamar_ws.get_all_records()
+    except Exception as e:
+        st.error(f"Gagal memuat data kamar: {str(e)}")
+        return
 
-    kamar_ws = connect_gsheet().worksheet("Kamar")
-    data = kamar_ws.get_all_records()
+    # Custom CSS untuk tampilan kamar
+    st.markdown("""
+    <style>
+    .kamar-card {
+        background: rgba(60,60,60,0.7);
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .kamar-status-kosong {
+        color: #66BB6A;
+        font-weight: bold;
+    }
+    .kamar-status-terisi {
+        color: #EF5350;
+        font-weight: bold;
+    }
+    .kamar-harga {
+        color: #FFA726;
+        font-weight: bold;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    st.markdown("### Daftar Kamar")
-    for k in data:
-        st.markdown(f"**{k['Nama']}** - {k['Status']} - Rp{k['Harga']}")
+    # Tab untuk navigasi
+    tab1, tab2 = st.tabs(["Daftar Kamar", "Tambah Kamar Baru"])
 
-    st.markdown("### Tambah Kamar Baru")
-    nama = st.text_input("Nama Kamar")
-    harga = st.number_input("Harga", min_value=0)
-    deskripsi = st.text_area("Deskripsi")
-    foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
-    if st.button("Tambah Kamar"):
-        link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
-        kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
-        st.success("Kamar berhasil ditambahkan.")
+    with tab1:
+        st.markdown("### Daftar Kamar Tersedia")
+        
+        if not kamar_data:
+            st.info("Belum ada data kamar.")
+        else:
+            for kamar in kamar_data:
+                with st.container():
+                    status_class = "kamar-status-kosong" if kamar['Status'] == 'Kosong' else "kamar-status-terisi"
+                    
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        if kamar.get('link_foto'):
+                            st.image(kamar['link_foto'], width=150, caption=kamar['Nama'])
+                        else:
+                            st.image("https://via.placeholder.com/150", width=150, caption="No Image")
+                    
+                    with col2:
+                        st.markdown(f"""
+                        <div class="kamar-card">
+                            <h3>{kamar['Nama']}</h3>
+                            <p>Status: <span class="{status_class}">{kamar['Status']}</span></p>
+                            <p>Harga: <span class="kamar-harga">Rp {int(kamar['Harga']):,}/bulan</span></p>
+                            <p>{kamar.get('Deskripsi', 'Tidak ada deskripsi')}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Tombol aksi
+                        col_edit, col_delete = st.columns(2)
+                        with col_edit:
+                            if st.button("✏️ Edit", key=f"edit_{kamar['Nama']}"):
+                                st.session_state.edit_kamar = kamar
+                        with col_delete:
+                            if st.button("🗑️ Hapus", key=f"delete_{kamar['Nama']}"):
+                                # Cari index kamar yang akan dihapus
+                                all_values = kamar_ws.get_all_values()
+                                row_num = next((i+1 for i, row in enumerate(all_values) if row[0] == kamar['Nama'], None)
+                                if row_num:
+                                    kamar_ws.delete_rows(row_num)
+                                    st.success(f"Kamar {kamar['Nama']} berhasil dihapus!")
+                                    st.rerun()
 
+        # Form edit kamar (muncul ketika tombol edit diklik)
+        if 'edit_kamar' in st.session_state:
+            with st.form(key='edit_kamar_form'):
+                st.markdown("### Edit Kamar")
+                kamar = st.session_state.edit_kamar
+                
+                nama = st.text_input("Nama Kamar", value=kamar['Nama'])
+                status = st.selectbox("Status", ["Kosong", "Terisi"], index=0 if kamar['Status'] == 'Kosong' else 1)
+                harga = st.number_input("Harga", min_value=0, value=int(kamar['Harga']))
+                deskripsi = st.text_area("Deskripsi", value=kamar.get('Deskripsi', ''))
+                foto = st.file_uploader("Upload Foto Baru", type=["jpg","jpeg","png"], key="edit_foto")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("💾 Simpan Perubahan"):
+                        # Cari index kamar yang akan diupdate
+                        all_values = kamar_ws.get_all_values()
+                        row_num = next((i+1 for i, row in enumerate(all_values) if row[0] == kamar['Nama'], None)
+                        
+                        if row_num:
+                            # Jika ada foto baru diupload
+                            link_foto = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else kamar.get('link_foto', '')
+                            
+                            # Update data
+                            kamar_ws.update(f"A{row_num}", nama)
+                            kamar_ws.update(f"B{row_num}", status)
+                            kamar_ws.update(f"C{row_num}", harga)
+                            kamar_ws.update(f"D{row_num}", deskripsi)
+                            kamar_ws.update(f"E{row_num}", link_foto)
+                            
+                            st.success("Data kamar berhasil diperbarui!")
+                            del st.session_state.edit_kamar
+                            st.rerun()
+                
+                with col2:
+                    if st.form_submit_button("❌ Batal"):
+                        del st.session_state.edit_kamar
+                        st.rerun()
+
+    with tab2:
+        st.markdown("### Tambah Kamar Baru")
+        with st.form(key='tambah_kamar_form'):
+            nama = st.text_input("Nama Kamar*")
+            harga = st.number_input("Harga*", min_value=0)
+            deskripsi = st.text_area("Deskripsi")
+            foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
+            
+            if st.form_submit_button("➕ Tambah Kamar"):
+                if not nama:
+                    st.error("Nama kamar wajib diisi!")
+                else:
+                    link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
+                    kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
+                    st.success("Kamar berhasil ditambahkan!")
+                    st.rerun()
 def manajemen():
     st.title("🗂️ Manajemen")
 
