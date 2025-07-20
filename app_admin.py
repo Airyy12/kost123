@@ -87,12 +87,67 @@ def login_page():
 # ---------- Penyewa Features ----------
 def penyewa_dashboard():
     st.title("📊 Dashboard Penyewa")
+
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
-    user_data = next(u for u in users if u['username']==st.session_state.username)
-    st.write(f"**Nama:** {user_data['username']}")
-    st.write(f"**Kamar:** {user_data.get('kamar','Belum Terdaftar')}")
-    st.write(f"**Status Pembayaran:** {user_data.get('Status Pembayaran','Belum Ada Data')}")
+    user_data = next(u for u in users if u['username'] == st.session_state.username)
+
+    kamar = user_data.get('kamar', 'Belum Terdaftar')
+    status_bayar = user_data.get('Status Pembayaran', 'Belum Ada Data')
+    kontak = user_data.get('kontak', '-')
+
+    st.markdown("""
+    <style>
+    .card {
+        background: linear-gradient(145deg, #f5f5f5, #e0e0e0);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .card h3 {
+        margin: 0;
+        font-size: 22px;
+    }
+    .card p {
+        margin: 5px 0 0;
+        font-size: 16px;
+        color: #555;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(f"""
+        <div class="card">
+            <h3>🏠 {kamar}</h3>
+            <p>Kamar Anda</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        color_status = "🟢" if "Lunas" in status_bayar else "🔴"
+        st.markdown(f"""
+        <div class="card">
+            <h3>{color_status} {status_bayar}</h3>
+            <p>Status Pembayaran</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="card">
+            <h3>📞 {kontak}</h3>
+            <p>Kontak</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.subheader("Informasi Tambahan")
+    st.info("Silakan gunakan menu sidebar untuk melakukan pembayaran, komplain, atau update profil.")
+
 
 def pembayaran():
     st.title("💸 Pembayaran Kost")
@@ -135,7 +190,78 @@ def profil_saya():
 # ---------- Admin Features ----------
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
-    st.write("Selamat datang di Panel Admin Kost123.")
+
+    kamar_ws = connect_gsheet().worksheet("Kamar")
+    user_ws = connect_gsheet().worksheet("User")
+    pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
+
+    kamar_data = kamar_ws.get_all_records()
+    user_data = user_ws.get_all_records()
+    bayar_data = pembayaran_ws.get_all_records()
+
+    total_kamar = len(kamar_data)
+    terisi = sum(1 for k in kamar_data if k['Status'] == "Terisi")
+    penyewa = sum(1 for u in user_data if u['role'] == "penyewa")
+    pembayaran = len(bayar_data)
+
+    st.markdown("""
+    <style>
+    .card {
+        background: linear-gradient(145deg, #f5f5f5, #e0e0e0);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .card h3 {
+        margin: 0;
+        font-size: 22px;
+    }
+    .card p {
+        margin: 5px 0 0;
+        font-size: 16px;
+        color: #555;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="card">
+            <h3>🏠 {total_kamar}</h3>
+            <p>Total Kamar</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="card">
+            <h3>🚪 {terisi}</h3>
+            <p>Kamar Terisi</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="card">
+            <h3>👥 {penyewa}</h3>
+            <p>Total Penyewa</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="card">
+            <h3>💳 {pembayaran}</h3>
+            <p>Data Pembayaran</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.subheader("Selamat datang di Admin Panel Kost123.")
+
 
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
