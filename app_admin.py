@@ -4,6 +4,7 @@ from sheets import connect_gsheet, load_sheet_data
 from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime, timedelta
 import bcrypt
+import requests
 
 def run_admin(menu):
     if menu == "Dashboard Admin":
@@ -20,9 +21,6 @@ def run_admin(menu):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
-import streamlit as st
-import pandas as pd
-from datetime import datetime
 
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
@@ -212,11 +210,14 @@ def kelola_kamar():
         color: #FFA726;
         font-weight: bold;
     }
+    .tab-content {
+        padding: 15px 0;
+    }
     </style>
     """, unsafe_allow_html=True)
 
     # Tab untuk navigasi
-    tab1, tab2 = st.tabs(["Daftar Kamar", "Tambah Kamar Baru"])
+    tab1, tab2 = st.tabs(["📋 Daftar Kamar", "➕ Tambah Kamar Baru"])
 
     with tab1:
         st.markdown("### Daftar Kamar Tersedia")
@@ -315,6 +316,7 @@ def kelola_kamar():
                     kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
                     st.success("Kamar berhasil ditambahkan!")
                     st.rerun()
+
 def manajemen():
     st.title("🗂️ Manajemen")
 
@@ -389,8 +391,6 @@ def manajemen_komplain():
                 st.warning("Komplain telah dihapus.")
                 st.rerun()
 
-import requests
-
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
 
@@ -452,7 +452,7 @@ def manajemen_pembayaran():
                     pembayaran_ws.update_cell(idx + 2, 7, "Ditolak")
                     st.warning(f"Pembayaran dari {username} ditolak.")
                     st.rerun()
-                    
+
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
 
@@ -509,7 +509,7 @@ def verifikasi_booking():
                     booking_ws.delete_rows(idx+2)
                     st.warning(f"Booking dari {b['nama']} ditolak.")
                     st.rerun()
-                    
+
 def profil_saya():
     if 'profil_submenu' not in st.session_state:
         st.session_state.profil_submenu = None
