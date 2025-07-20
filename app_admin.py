@@ -86,7 +86,7 @@ def dashboard_admin():
                 if str(p.get('nominal', '')).isdigit() and 
                    p.get('bulan') == bulan_ini and 
                    p.get('tahun') == str(tahun_ini)
-        
+            )
         # Tampilkan metrik
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Kamar", total_kamar)
