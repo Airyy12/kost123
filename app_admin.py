@@ -131,10 +131,14 @@ def manajemen_komplain():
         st.info("Belum ada komplain.")
         return
 
-    # Tambahkan kolom status jika belum ada
-    if 'status' not in df.columns:
+    # Pastikan kolom 'status' ada
+    header = komplain_ws.row_values(1)
+    if 'status' not in header:
+        header.append('status')
+        komplain_ws.update('A1', [header])
         df['status'] = ''
-        komplain_ws.update('E1', 'status')  # asumsi kolom E kosong
+    elif 'status' not in df.columns:
+        df['status'] = ''
 
     # Filter hanya komplain belum selesai
     df_belum = df[df['status'].str.lower() != 'selesai']
@@ -143,7 +147,6 @@ def manajemen_komplain():
         st.success("Semua komplain telah diselesaikan.")
         return
 
-    # Buat pilihan drop down
     pilihan = {
         f"{row['isi_komplain']} ({row['username']})": idx
         for idx, row in df_belum.iterrows()
@@ -164,11 +167,11 @@ def manajemen_komplain():
         else:
             st.caption("Tidak ada foto terlampir.")
 
-        # Tombol tandai selesai
         if st.button("✅ Tandai Komplain Ini Selesai"):
-            # Update status di worksheet
-            row_number = selected_idx + 2  # header = row 1
-            komplain_ws.update_cell(row_number, df.columns.get_loc('status') + 1, 'selesai')
+            # Update ke baris yang benar
+            row_number = selected_idx + 2  # +2 karena header di baris 1
+            col_index = header.index('status') + 1  # kolom dimulai dari 1
+            komplain_ws.update_cell(row_number, col_index, 'selesai')
             st.success("Komplain telah ditandai selesai.")
             st.experimental_rerun()
 
