@@ -145,7 +145,9 @@ def manajemen_komplain():
             if st.button("Hapus Komplain Ini", key=f"hapus_{idx}"):
                 komplain_ws.delete_rows(idx + 2)
                 st.warning("Komplain telah dihapus.")
-                st.experimental_rerun()
+                st.rerun()
+
+import requests
 
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
@@ -172,9 +174,19 @@ def manajemen_pembayaran():
             st.write(f"**Waktu Upload:** {waktu}")
 
             if bukti_link:
-                st.image(bukti_link, caption="Bukti Pembayaran", use_container_width=True)
+                try:
+                    response = requests.get(bukti_link, timeout=5)
+                    if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                        st.image(bukti_link, caption="Bukti Pembayaran", use_container_width=True)
+                    else:
+                        st.warning("❗ Gagal menampilkan gambar: URL tidak valid atau bukan file gambar.")
+                except Exception as e:
+                    st.warning(f"❗ Gagal memuat gambar bukti: {e}")
+            else:
+                st.info("Tidak ada bukti pembayaran yang diunggah.")
 
             col1, col2 = st.columns(2)
+
             with col1:
                 if st.button("✅ Verifikasi", key=f"verif_{idx}"):
                     user_ws = connect_gsheet().worksheet("User")
@@ -182,17 +194,17 @@ def manajemen_pembayaran():
                     user_idx = next((i for i, u in enumerate(users) if u['username'] == username), None)
 
                     if user_idx is not None:
-                        user_ws.update_cell(user_idx+2, 9, "Lunas")
-                        st.success(f"Pembayaran {username} berhasil diverifikasi.")
+                        user_ws.update_cell(user_idx + 2, 9, "Lunas")
+                        st.success(f"Pembayaran dari {username} berhasil diverifikasi.")
 
-                    pembayaran_ws.delete_rows(idx+2)
-                    st.experimental_rerun()
+                    pembayaran_ws.delete_rows(idx + 2)
+                    st.rerun()
 
             with col2:
                 if st.button("❌ Tolak", key=f"tolak_{idx}"):
-                    pembayaran_ws.delete_rows(idx+2)
+                    pembayaran_ws.delete_rows(idx + 2)
                     st.warning(f"Pembayaran dari {username} ditolak.")
-                    st.experimental_rerun()
+                    st.rerun()
 
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
