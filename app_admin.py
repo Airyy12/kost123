@@ -255,7 +255,7 @@ def kelola_kamar():
                             if st.button("🗑️ Hapus", key=f"delete_{kamar['Nama']}"):
                                 # Cari index kamar yang akan dihapus
                                 all_values = kamar_ws.get_all_values()
-                                row_num = next((i+1 for i, row in enumerate(all_values) if row[0] == kamar['Nama'], None)
+                                row_num = next((i+1 for i, row in enumerate(all_values) if row[0] == kamar['Nama']), None)
                                 if row_num:
                                     kamar_ws.delete_rows(row_num)
                                     st.success(f"Kamar {kamar['Nama']} berhasil dihapus!")
@@ -278,7 +278,7 @@ def kelola_kamar():
                     if st.form_submit_button("💾 Simpan Perubahan"):
                         # Cari index kamar yang akan diupdate
                         all_values = kamar_ws.get_all_values()
-                        row_num = next((i+1 for i, row in enumerate(all_values) if row[0] == kamar['Nama'], None)
+                        row_num = next((i+1 for i, row in enumerate(all_values) if row[0] == kamar['Nama']), None)
                         
                         if row_num:
                             # Jika ada foto baru diupload
