@@ -46,7 +46,7 @@ def admin_dashboard():
                 st.markdown(f"""
                 <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {row['waktu']}</strong><br>
-                    🧑 <strong>{row['username']}</strong><br>
+                    🧑 <strong>{row['nama']}</strong><br>
                     📝 {row['isi_komplain']}
                 </div>
                 """, unsafe_allow_html=True)
@@ -61,7 +61,7 @@ def admin_dashboard():
                 st.markdown(f"""
                 <div style="background-color:#dbeafe; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {b['waktu_booking']}</strong><br>
-                    🧑 <strong>{b['username']}</strong> memesan kamar <strong>{b['kamar_dipilih']}</strong>
+                    🧑 <strong>{b['nama']}</strong> memesan kamar <strong>{b['kamar_dipilih']}</strong>
                 </div>
                 """, unsafe_allow_html=True)
 
