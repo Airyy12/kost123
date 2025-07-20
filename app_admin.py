@@ -1,3 +1,9 @@
+from admin_fitur.dashboard_admin import admin_dashboard
+from admin_fitur.kelola_kamar import kelola_kamar
+from admin_fitur.manajemen_penyewa import manajemen_penyewa
+from admin_fitur.verifikasi_booking import verifikasi_booking
+from user_fitur.profil import profil_saya
+
 import streamlit as st
 from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
