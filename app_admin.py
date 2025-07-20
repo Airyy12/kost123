@@ -1,505 +1,591 @@
-# 📌 aplikasi_kasir.py
 import streamlit as st
 import pandas as pd
-import json
-import os
-import shutil
+from sheets import connect_gsheet
+from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime, timedelta
-import plotly.express as px
-import plotly.graph_objects as go
-import io
-import hashlib
 import bcrypt
-import sqlite3
-from stqdm import stqdm
-import warnings
-from PIL import Image
-import cv2  # Untuk barcode scanner (opsional)
-import numpy as np
+import re
+import time
 
-# 🔒 Konfigurasi Keamanan
-warnings.filterwarnings('ignore')
-st.set_page_config(
-    page_title="Toko Wawan - Aplikasi Kasir", 
-    page_icon="🛒", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Fungsi utilitas
+def validasi_nomor_hp(nomor):
+    """Validasi format nomor HP"""
+    return re.match(r'^[0-9+\- ]+$', nomor) is not None
 
-# 📂 File & Database
-AKUN_DB = "database/akun.db"
-BARANG_DB = "database/barang.db"
-TRANSAKSI_DB = "database/transaksi.db"
-BACKUP_DIR = "backup/"
+def validasi_email(email):
+    """Validasi format email"""
+    return re.match(r'^[^@]+@[^@]+\.[^@]+$', email) is not None
 
-# 🔄 Inisialisasi Database
-def init_db():
-    os.makedirs("database", exist_ok=True)
-    
-    # Database Akun
-    conn = sqlite3.connect(AKUN_DB)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 username TEXT UNIQUE,
-                 password TEXT,
-                 role TEXT,
-                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    conn.commit()
-    conn.close()
-    
-    # Database Barang
-    conn = sqlite3.connect(BARANG_DB)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS products
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 nama TEXT,
-                 kategori TEXT,
-                 harga_modal REAL,
-                 harga_jual REAL,
-                 stok INTEGER,
-                 barcode TEXT UNIQUE,
-                 min_stok INTEGER DEFAULT 3,
-                 terjual INTEGER DEFAULT 0)''')
-    conn.commit()
-    conn.close()
-    
-    # Database Transaksi
-    conn = sqlite3.connect(TRANSAKSI_DB)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS transactions
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 waktu TIMESTAMP,
-                 items TEXT,  # JSON format
-                 subtotal REAL,
-                 diskon REAL,
-                 pajak REAL,
-                 total REAL,
-                 pembayaran REAL,
-                 kembalian REAL,
-                 user TEXT)''')
-    conn.commit()
-    conn.close()
+def format_rupiah(jumlah):
+    """Format angka menjadi mata uang Rupiah"""
+    return f"Rp {int(jumlah):,}"
 
-# 🔐 Fungsi Keamanan
-def hash_password(password):
-    """Enkripsi password dengan bcrypt"""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(input_password, hashed_password):
-    """Verifikasi password"""
-    return bcrypt.checkpw(input_password.encode('utf-8'), hashed_password.encode('utf-8'))
-
-# 🔄 Backup Otomatis
-def auto_backup():
-    today = datetime.now().strftime("%Y%m%d")
-    backup_file = f"{BACKUP_DIR}backup_{today}.db"
-    
-    if not os.path.exists(BACKUP_DIR):
-        os.makedirs(BACKUP_DIR)
-    
-    if not os.path.exists(backup_file):
-        for db_file in [AKUN_DB, BARANG_DB, TRANSAKSI_DB]:
-            shutil.copy2(db_file, backup_file)
-        st.toast("✅ Backup otomatis berhasil dibuat", icon="💾")
-
-# ==============================================
-# 🖥️ TAMPILAN APLIKASI
-# ==============================================
-
-# 🔐 Modul Login
-def login_module():
-    st.title("🔑 Login Sistem Kasir")
-    tab1, tab2 = st.tabs(["Login", "Daftar Akun (Admin)"])
-    
-    with tab1:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        role = st.radio("Role", ["admin", "kasir"], horizontal=True)
-        
-        if st.button("Masuk", type="primary"):
-            conn = sqlite3.connect(AKUN_DB)
-            c = conn.cursor()
-            c.execute("SELECT password FROM users WHERE username=? AND role=?", (username, role))
-            result = c.fetchone()
-            conn.close()
-            
-            if result and verify_password(password, result[0]):
-                st.session_state.user = username
-                st.session_state.role = role
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Username/password salah atau role tidak sesuai!")
-    
-    with tab2:
-        if 'logged_in' in st.session_state and st.session_state.role == 'admin':
-            new_user = st.text_input("Username Baru")
-            new_pass = st.text_input("Password Baru", type="password")
-            new_role = st.selectbox("Role", ["admin", "kasir"])
-            
-            if st.button("Buat Akun"):
-                if not new_user or not new_pass:
-                    st.warning("Username dan password wajib diisi!")
-                else:
-                    try:
-                        conn = sqlite3.connect(AKUN_DB)
-                        c = conn.cursor()
-                        c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                                 (new_user, hash_password(new_pass), new_role))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"Akun {new_role} untuk {new_user} berhasil dibuat!")
-                    except sqlite3.IntegrityError:
-                        st.error("Username sudah terdaftar!")
-
-# 📦 Modul Produk
-def product_module():
-    st.header("📦 Manajemen Produk")
-    tab1, tab2, tab3 = st.tabs(["Daftar Produk", "Tambah Produk", "Stok Alert"])
-    
-    with tab1:
-        conn = sqlite3.connect(BARANG_DB)
-        df = pd.read_sql("SELECT * FROM products", conn)
-        conn.close()
-        
-        st.dataframe(
-            df,
-            use_container_width=True,
-            column_config={
-                "harga_modal": st.column_config.NumberColumn(format="Rp %d"),
-                "harga_jual": st.column_config.NumberColumn(format="Rp %d")
-            }
-        )
-    
-    with tab2:
-        with st.form("tambah_produk"):
-            col1, col2 = st.columns(2)
-            with col1:
-                nama = st.text_input("Nama Produk*")
-                kategori = st.text_input("Kategori*")
-                barcode = st.text_input("Barcode (Opsional)")
-            with col2:
-                modal = st.number_input("Harga Modal*", min_value=0)
-                jual = st.number_input("Harga Jual*", min_value=0)
-                stok = st.number_input("Stok Awal*", min_value=0)
-            
-            if st.form_submit_button("💾 Simpan Produk"):
-                if not nama or not kategori:
-                    st.warning("Nama dan kategori wajib diisi!")
-                else:
-                    try:
-                        conn = sqlite3.connect(BARANG_DB)
-                        c = conn.cursor()
-                        c.execute("INSERT INTO products (nama, kategori, harga_modal, harga_jual, stok, barcode) VALUES (?, ?, ?, ?, ?, ?)",
-                                 (nama, kategori, modal, jual, stok, barcode))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"Produk {nama} berhasil ditambahkan!")
-                    except sqlite3.IntegrityError:
-                        st.error("Barcode sudah terdaftar untuk produk lain!")
-    
-    with tab3:
-        conn = sqlite3.connect(BARANG_DB)
-        low_stock = pd.read_sql("SELECT nama, stok FROM products WHERE stok <= min_stok ORDER BY stok ASC", conn)
-        conn.close()
-        
-        if not low_stock.empty:
-            st.warning("🚨 Produk dengan Stok Menipis:")
-            st.dataframe(low_stock, hide_index=True)
-        else:
-            st.success("✅ Semua stok produk aman")
-
-# 🛒 Modul Transaksi
-def transaction_module():
-    st.header("🛒 Transaksi Penjualan")
-    
-    # Inisialisasi keranjang
-    if 'cart' not in st.session_state:
-        st.session_state.cart = []
-    
-    col1, col2 = st.columns([3, 2])
-    
-    with col1:
-        # Pencarian Produk
-        conn = sqlite3.connect(BARANG_DB)
-        df_products = pd.read_sql("SELECT id, nama, harga_jual, stok FROM products WHERE stok > 0", conn)
-        conn.close()
-        
-        selected_product = st.selectbox(
-            "🔍 Cari Produk",
-            df_products['nama'],
-            index=None,
-            placeholder="Pilih produk..."
-        )
-        
-        if selected_product:
-            product_data = df_products[df_products['nama'] == selected_product].iloc[0]
-            
-            col_qty, col_price = st.columns(2)
-            with col_qty:
-                qty = st.number_input(
-                    "Jumlah",
-                    min_value=1,
-                    max_value=int(product_data['stok']),
-                    value=1
-                )
-            with col_price:
-                st.metric("Harga Satuan", f"Rp {product_data['harga_jual']:,.0f}")
-            
-            if st.button("➕ Tambah ke Keranjang", type="primary"):
-                st.session_state.cart.append({
-                    'id': product_data['id'],
-                    'nama': product_data['nama'],
-                    'harga': product_data['harga_jual'],
-                    'qty': qty,
-                    'subtotal': product_data['harga_jual'] * qty
-                })
-                st.success(f"{qty} {selected_product} ditambahkan ke keranjang!")
-                st.rerun()
-    
-    with col2:
-        # Ringkasan Pembayaran
-        st.subheader("📝 Keranjang Belanja")
-        
-        if not st.session_state.cart:
-            st.info("Keranjang kosong")
-        else:
-            total = sum(item['subtotal'] for item in st.session_state.cart)
-            
-            for i, item in enumerate(st.session_state.cart):
-                cols = st.columns([3, 2, 1])
-                with cols[0]:
-                    st.write(f"{item['nama']}")
-                with cols[1]:
-                    st.write(f"{item['qty']} x Rp {item['harga']:,.0f}")
-                with cols[2]:
-                    if st.button("❌", key=f"del_{i}"):
-                        st.session_state.cart.pop(i)
-                        st.rerun()
-            
-            st.divider()
-            
-            # Pengaturan Diskon & Pajak
-            with st.expander("⚙️ Pengaturan Pembayaran"):
-                diskon = st.number_input("Diskon (%)", min_value=0, max_value=100, value=0)
-                pajak = st.number_input("Pajak (%)", min_value=0, max_value=10, value=0)
-            
-            # Hitung Total
-            total_diskon = total * diskon / 100
-            total_pajak = (total - total_diskon) * pajak / 100
-            grand_total = total - total_diskon + total_pajak
-            
-            st.metric("TOTAL PEMBAYARAN", f"Rp {grand_total:,.0f}", delta=f"Diskon: Rp {total_diskon:,.0f}")
-            
-            # Pembayaran
-            pembayaran = st.number_input(
-                "💵 Uang Diterima",
-                min_value=0.0,
-                value=float(grand_total),
-                step=1000.0
-            )
-            
-            if pembayaran < grand_total:
-                st.error("Uang tidak cukup!")
-            else:
-                kembalian = pembayaran - grand_total
-                st.metric("Kembalian", f"Rp {kembalian:,.0f}")
-                
-                if st.button("💳 Proses Pembayaran", type="primary"):
-                    process_payment(
-                        items=st.session_state.cart,
-                        subtotal=total,
-                        diskon=total_diskon,
-                        pajak=total_pajak,
-                        total=grand_total,
-                        pembayaran=pembayaran,
-                        kembalian=kembalian
-                    )
-                    st.session_state.cart = []
-                    st.rerun()
-
-def process_payment(items, subtotal, diskon, pajak, total, pembayaran, kembalian):
-    """Simpan transaksi ke database"""
+def dapatkan_worksheet(nama):
+    """Mendapatkan worksheet dengan penanganan error"""
     try:
-        conn = sqlite3.connect(TRANSAKSI_DB)
-        c = conn.cursor()
-        
-        # Simpan transaksi
-        c.execute("""
-            INSERT INTO transactions 
-            (waktu, items, subtotal, diskon, pajak, total, pembayaran, kembalian, user) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            json.dumps(items),
-            subtotal,
-            diskon,
-            pajak,
-            total,
-            pembayaran,
-            kembalian,
-            st.session_state.user
-        ))
-        
-        # Update stok produk
-        for item in items:
-            c.execute("""
-                UPDATE products 
-                SET stok = stok - ?, 
-                    terjual = terjual + ? 
-                WHERE id = ?
-            """, (item['qty'], item['qty'], item['id']))
-        
-        conn.commit()
-        conn.close()
-        
-        # Generate struk
-        generate_receipt(items, subtotal, diskon, pajak, total, pembayaran, kembalian)
-        st.success("✅ Transaksi berhasil diproses!")
-        st.balloons()
-        
+        sheet = connect_gsheet()
+        return sheet.worksheet(nama)
     except Exception as e:
-        st.error(f"Gagal memproses transaksi: {str(e)}")
+        st.error(f"Gagal terhubung ke worksheet {nama}: {str(e)}")
+        st.stop()
 
-def generate_receipt(items, subtotal, diskon, pajak, total, pembayaran, kembalian):
-    """Generate struk transaksi"""
-    receipt = [
-        "TOKO WAWAN",
-        "Jl. Contoh No. 123",
-        "=" * 30,
-        f"Kasir: {st.session_state.user}",
-        f"Waktu: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-        "-" * 30
-    ]
+def konfirmasi_aksi(nama_aksi):
+    """Dialog konfirmasi untuk aksi penting"""
+    return st.checkbox(f"Yakin ingin {nama_aksi}?", key=f"konfirmasi_{nama_aksi}")
+
+def tampilkan_loading(pesan):
+    """Menampilkan indikator loading"""
+    return st.spinner(pesan)
+
+# Fungsi utama admin
+def jalankan_admin(menu):
+    """Router menu utama admin"""
+    if menu == "Dashboard Admin":
+        dashboard_admin()
+    elif menu == "Kelola Kamar":
+        kelola_kamar()
+    elif menu == "Manajemen":
+        manajemen()
+    elif menu == "Verifikasi Booking":
+        verifikasi_booking()
+    elif menu == "Profil Saya":
+        profil_saya()
+    elif menu == "Keluar":
+        keluar()
+
+def keluar():
+    """Proses logout dengan membersihkan session"""
+    for key in list(st.session_state.keys()):
+        if key not in ['rerun', '_']:  # Menyimpan key internal streamlit
+            del st.session_state[key]
+    st.rerun()
+
+def dashboard_admin():
+    """Halaman dashboard admin"""
+    st.title("📊 Dashboard Admin")
     
-    for item in items:
-        receipt.append(f"{item['nama'][:20]:<20} {item['qty']:>2}x {item['harga']:>7,.0f}")
-        receipt.append(f"{' ':>20} Rp {item['subtotal']:>7,.0f}")
+    try:
+        with tampilkan_loading("Memuat data..."):
+            # Muat semua data
+            data_kamar = dapatkan_worksheet("Kamar").get_all_records()
+            data_user = dapatkan_worksheet("User").get_all_records()
+            data_pembayaran = dapatkan_worksheet("Pembayaran").get_all_records()
+            data_komplain = dapatkan_worksheet("Komplain").get_all_records()
+            
+            # Hitung metrik
+            total_kamar = len(data_kamar)
+            kamar_terisi = sum(1 for k in data_kamar if k.get('Status', '').lower() == 'terisi')
+            kamar_kosong = total_kamar - kamar_terisi
+            penyewa = sum(1 for u in data_user if u.get('role') == 'penyewa')
+            
+            # Hitung pendapatan bulan ini
+            bulan_ini = datetime.now().strftime("%B")
+            tahun_ini = datetime.now().year
+            pemasukan_bulan_ini = sum(
+                int(p.get('nominal', 0)) for p in data_pembayaran 
+                if str(p.get('nominal', '')).isdigit() and 
+                   p.get('bulan') == bulan_ini and 
+                   p.get('tahun') == str(tahun_ini)
+        
+        # Tampilkan metrik
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Kamar", total_kamar)
+        col2.metric("Kamar Terisi", kamar_terisi)
+        col3.metric("Kamar Kosong", kamar_kosong)
+        col4.metric("Penyewa Aktif", penyewa)
+
+        st.markdown("### 💰 Pemasukan Bulan Ini")
+        st.write(format_rupiah(pemasukan_bulan_ini))
+
+        st.markdown("### 📢 Komplain Terbaru")
+        if not data_komplain:
+            st.info("Belum ada komplain")
+        else:
+            for k in sorted(data_komplain[-5:], key=lambda x: x.get('waktu', ''), reverse=True):
+                status = k.get('status', 'Pending')
+                warna = "green" if status.lower() == 'selesai' else "orange" if status.lower() == 'ditolak' else "gray"
+                st.markdown(f"""
+                **{k.get('username', 'N/A')}**  
+                📅 {k.get('waktu', '')}  
+                🏷️ <span style='color:{warna}'>{status}</span>  
+                💬 {k.get('isi_komplain', '')[:100]}...
+                """, unsafe_allow_html=True)
+                
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
+
+def kelola_kamar():
+    """Halaman pengelolaan kamar"""
+    st.title("🛠️ Kelola Kamar")
     
-    receipt.extend([
-        "-" * 30,
-        f"Subtotal: Rp {subtotal:>7,.0f}",
-        f"Diskon: Rp {diskon:>7,.0f}",
-        f"Pajak: Rp {pajak:>7,.0f}",
-        f"Total: Rp {total:>7,.0f}",
-        f"Bayar: Rp {pembayaran:>7,.0f}",
-        f"Kembali: Rp {kembalian:>7,.0f}",
-        "=" * 30,
-        "Terima kasih telah berbelanja!",
-        "Barang yang sudah dibeli tidak dapat dikembalikan"
-    ])
+    try:
+        ws_kamar = dapatkan_worksheet("Kamar")
+        data_kamar = ws_kamar.get_all_records()
+        
+        tab1, tab2 = st.tabs(["Daftar Kamar", "Tambah Kamar"])
+        
+        with tab1:
+            st.markdown("### Daftar Kamar")
+            
+            if not data_kamar:
+                st.info("Belum ada data kamar")
+            else:
+                pencarian = st.text_input("Cari Kamar")
+                filtered = data_kamar
+                if pencarian:
+                    filtered = [k for k in data_kamar if pencarian.lower() in k.get('Nama', '').lower()]
+                
+                for k in filtered:
+                    with st.expander(f"{k.get('Nama', '')} - {k.get('Status', '')}"):
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            if k.get('Foto'):
+                                st.image(k['Foto'], use_column_width=True)
+                        with col2:
+                            st.markdown(f"""
+                            **Status:** {k.get('Status', '')}  
+                            **Harga:** {format_rupiah(k.get('Harga', 0))}  
+                            **Deskripsi:** {k.get('Deskripsi', '')}
+                            """)
+                        
+                        if st.button("Hapus Kamar", key=f"hapus_{k.get('Nama', '')}"):
+                            if konfirmasi_aksi("menghapus kamar ini"):
+                                nomor_baris = data_kamar.index(k) + 2
+                                ws_kamar.delete_rows(nomor_baris)
+                                st.success("Kamar berhasil dihapus")
+                                time.sleep(1)
+                                st.rerun()
+        
+        with tab2:
+            st.markdown("### Tambah Kamar Baru")
+            with st.form("form_tambah_kamar"):
+                nama = st.text_input("Nama Kamar*", help="Wajib diisi")
+                harga = st.number_input("Harga*", min_value=0, value=1000000)
+                deskripsi = st.text_area("Deskripsi")
+                foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
+                
+                if st.form_submit_button("Simpan Kamar"):
+                    if not nama:
+                        st.error("Nama kamar wajib diisi")
+                    else:
+                        with tampilkan_loading("Menyimpan kamar..."):
+                            link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
+                            ws_kamar.append_row([
+                                nama, 
+                                "Kosong", 
+                                harga, 
+                                deskripsi, 
+                                link
+                            ])
+                            st.success("Kamar berhasil ditambahkan")
+                            time.sleep(1)
+                            st.rerun()
     
-    # Tampilkan struk
-    st.subheader("📃 Struk Transaksi")
-    st.code("\n".join(receipt))
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
+
+def manajemen():
+    """Menu manajemen utama"""
+    st.title("🗂️ Manajemen")
     
-    # Download button
-    st.download_button(
-        label="⬇️ Download Struk",
-        data="\n".join(receipt),
-        file_name=f"struk_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        mime="text/plain"
+    submenu = st.selectbox(
+        "Pilih Submenu", 
+        ["Manajemen Penyewa", "Manajemen Pembayaran", "Manajemen Komplain"],
+        key="submenu_manajemen"
     )
+    
+    if submenu == "Manajemen Penyewa":
+        manajemen_penyewa()
+    elif submenu == "Manajemen Pembayaran":
+        manajemen_pembayaran()
+    elif submenu == "Manajemen Komplain":
+        manajemen_komplain()
 
-# 📊 Modul Laporan
-def report_module():
-    st.header("📊 Laporan Penjualan")
+def manajemen_penyewa():
+    """Halaman manajemen penyewa"""
+    st.title("👥 Manajemen Penyewa")
     
-    # Filter tanggal
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Dari Tanggal", datetime.now() - timedelta(days=7))
-    with col2:
-        end_date = st.date_input("Sampai Tanggal", datetime.now())
-    
-    # Ambil data transaksi
-    conn = sqlite3.connect(TRANSAKSI_DB)
-    query = f"""
-        SELECT * FROM transactions 
-        WHERE date(waktu) BETWEEN '{start_date}' AND '{end_date}'
-        ORDER BY waktu DESC
-    """
-    df = pd.read_sql(query, conn)
-    conn.close()
-    
-    if df.empty:
-        st.warning("Tidak ada transaksi pada periode ini")
-        return
-    
-    # Konversi items dari JSON ke dataframe
-    df_items = pd.json_normalize(df['items'].apply(json.loads).explode('items')
-    df_items = pd.json_normalize(df_items['items'])
-    
-    # Tampilkan ringkasan
-    st.subheader("📈 Ringkasan")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Transaksi", len(df))
-    col2.metric("Total Pendapatan", f"Rp {df['total'].sum():,.0f}")
-    col3.metric("Rata-rata per Transaksi", f"Rp {df['total'].mean():,.0f}")
-    
-    # Grafik
-    st.subheader("📊 Visualisasi Data")
-    tab1, tab2 = st.tabs(["Trend Harian", "Produk Terlaris"])
-    
-    with tab1:
-        df['tanggal'] = pd.to_datetime(df['waktu']).dt.date
-        daily_sales = df.groupby('tanggal')['total'].sum().reset_index()
+    try:
+        ws_user = dapatkan_worksheet("User")
+        ws_kamar = dapatkan_worksheet("Kamar")
         
-        fig = px.line(
-            daily_sales, 
-            x='tanggal', 
-            y='total',
-            title="Trend Penjualan Harian",
-            labels={'tanggal': 'Tanggal', 'total': 'Total Penjualan'}
+        data_user = ws_user.get_all_records()
+        data_kamar = ws_kamar.get_all_records()
+        penyewa = [u for u in data_user if u.get('role') == 'penyewa']
+        
+        if not penyewa:
+            st.info("Belum ada data penyewa")
+            return
+            
+        pencarian = st.text_input("Cari Penyewa")
+        if pencarian:
+            penyewa = [p for p in penyewa if pencarian.lower() in p.get('nama_lengkap', '').lower()]
+        
+        for idx, p in enumerate(penyewa):
+            with st.expander(f"{p.get('nama_lengkap', p['username'])} - {p.get('kamar','-')}"):
+                with st.form(key=f"form_{p['username']}"):
+                    nama = st.text_input("Nama Lengkap", value=p.get('nama_lengkap',''))
+                    kontak = st.text_input("No HP/Email", value=p.get('no_hp',''))
+                    
+                    # Pilihan kamar
+                    opsi_kamar = [k['Nama'] for k in data_kamar]
+                    kamar_sekarang = p.get('kamar','')
+                    index_kamar = opsi_kamar.index(kamar_sekarang) if kamar_sekarang in opsi_kamar else 0
+                    kamar = st.selectbox(
+                        "Kamar", 
+                        options=opsi_kamar,
+                        index=index_kamar
+                    )
+                    
+                    deskripsi = st.text_area("Deskripsi", value=p.get('deskripsi',''))
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        if st.form_submit_button("💾 Simpan"):
+                            # Validasi kontak
+                            if kontak and not (validasi_nomor_hp(kontak) or validasi_email(kontak)):
+                                st.error("Format kontak tidak valid (harus nomor HP atau email)")
+                            else:
+                                with tampilkan_loading("Menyimpan..."):
+                                    ws_user.update(f"D{idx+2}", nama)
+                                    ws_user.update(f"E{idx+2}", f"'{kontak}")
+                                    ws_user.update(f"F{idx+2}", kamar)
+                                    ws_user.update(f"G{idx+2}", deskripsi)
+                                st.success("Data berhasil diperbarui!")
+                    with col2:
+                        if st.form_submit_button("🔄 Reset Password"):
+                            if konfirmasi_aksi("reset password ke default (12345678)"):
+                                password_baru = "12345678"
+                                hashed = bcrypt.hashpw(password_baru.encode(), bcrypt.gensalt()).decode()
+                                ws_user.update(f"B{idx+2}", hashed)
+                                st.warning(f"Password direset ke {password_baru}")
+                    with col3:
+                        if st.form_submit_button("❌ Hapus"):
+                            if konfirmasi_aksi("menghapus penyewa ini"):
+                                ws_user.delete_rows(idx+2)
+                                st.warning("Penyewa dihapus!")
+                                time.sleep(1)
+                                st.rerun()
+    
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
+
+def manajemen_pembayaran():
+    """Halaman manajemen pembayaran"""
+    st.title("💸 Manajemen Pembayaran")
+    
+    try:
+        ws_pembayaran = dapatkan_worksheet("Pembayaran")
+        ws_user = dapatkan_worksheet("User")
+        
+        data_pembayaran = ws_pembayaran.get_all_records()
+        
+        if not data_pembayaran:
+            st.info("Belum ada data pembayaran")
+            return
+            
+        # Filter
+        col1, col2 = st.columns(2)
+        with col1:
+            filter_bulan = st.selectbox(
+                "Filter Bulan",
+                options=["Semua"] + ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
+                index=0
+            )
+        with col2:
+            filter_tahun = st.selectbox(
+                "Filter Tahun",
+                options=["Semua"] + list(range(2020, datetime.now().year + 1)),
+                index=0
+            )
+        
+        # Terapkan filter
+        filtered = data_pembayaran
+        if filter_bulan != "Semua":
+            filtered = [p for p in filtered if p.get('bulan') == filter_bulan]
+        if filter_tahun != "Semua":
+            filtered = [p for p in filtered if p.get('tahun') == str(filter_tahun)]
+        
+        # Tampilkan pembayaran
+        for idx, p in enumerate(filtered):
+            username = p.get('username', '-')
+            bulan = p.get('bulan', '-')
+            tahun = p.get('tahun', '-')
+            nominal = p.get('nominal', '0')
+            waktu = p.get('waktu', '-')
+            bukti_link = p.get('bukti', '')
+            
+            with st.expander(f"{username} - Bulan {bulan}/{tahun} - {format_rupiah(nominal)}"):
+                st.markdown(f"""
+                **👤 Nama:** {username}  
+                **📅 Bulan/Tahun:** {bulan} / {tahun}  
+                **💰 Nominal:** {format_rupiah(nominal)}  
+                **🕒 Waktu Upload:** {waktu}
+                """)
+                
+                if bukti_link:
+                    st.image(bukti_link, caption="Bukti Pembayaran", use_column_width=True)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Verifikasi", key=f"verif_{idx}"):
+                        if konfirmasi_aksi("memverifikasi pembayaran ini"):
+                            data_user = ws_user.get_all_records()
+                            user_idx = next(
+                                (i for i, u in enumerate(data_user) 
+                                 if u.get('username') == username),
+                                None
+                            )
+                            if user_idx is not None:
+                                with tampilkan_loading("Memverifikasi..."):
+                                    ws_user.update_cell(user_idx+2, 10, "Lunas")  # Kolom status_pembayaran
+                                    ws_pembayaran.delete_rows(idx+2)
+                                    st.success("Pembayaran berhasil diverifikasi!")
+                                    time.sleep(1)
+                                    st.rerun()
+                with col2:
+                    if st.button("❌ Tolak", key=f"tolak_{idx}"):
+                        if konfirmasi_aksi("menolak pembayaran ini"):
+                            ws_pembayaran.delete_rows(idx+2)
+                            st.warning("Pembayaran ditolak!")
+                            time.sleep(1)
+                            st.rerun()
+    
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
+
+def manajemen_komplain():
+    """Halaman manajemen komplain"""
+    st.title("📢 Manajemen Komplain")
+    
+    try:
+        ws_komplain = dapatkan_worksheet("Komplain")
+        data_komplain = ws_komplain.get_all_records()
+        
+        if not data_komplain:
+            st.info("Belum ada data komplain")
+            return
+            
+        # Filter status
+        filter_status = st.selectbox(
+            "Filter Status",
+            options=["Semua", "Pending", "Selesai", "Ditolak"],
+            index=0
         )
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with tab2:
-        top_products = df_items.groupby('nama').agg({
-            'qty': 'sum',
-            'subtotal': 'sum'
-        }).sort_values('qty', ascending=False).head(10)
         
-        fig = px.bar(
-            top_products,
-            x='qty',
-            y=top_products.index,
-            orientation='h',
-            title="10 Produk Terlaris",
-            labels={'qty': 'Jumlah Terjual'}
+        # Terapkan filter
+        filtered = data_komplain
+        if filter_status != "Semua":
+            filtered = [k for k in data_komplain if k.get('status', '').lower() == filter_status.lower()]
+        
+        # Tampilkan komplain
+        for idx, k in enumerate(filtered):
+            username = k.get("username", "-")
+            bulan = k.get("bulan", "-")
+            tahun = k.get("tahun", "-")
+            isi = k.get("isi_komplain", "-")
+            foto = k.get("link_foto", "")
+            status = k.get("status", "Pending").capitalize()
+            
+            warna_status = {
+                "Pending": "orange",
+                "Selesai": "green",
+                "Ditolak": "red"
+            }.get(status, "gray")
+            
+            with st.expander(f"{username} - Bulan {bulan}/{tahun} - 🏷️ <span style='color:{warna_status}'>{status}</span>", unsafe_allow_html=True):
+                st.markdown(f"""
+                **👤 Nama:** {username}  
+                **📅 Bulan/Tahun:** {bulan} / {tahun}  
+                **💬 Komplain:** {isi}
+                """)
+                
+                if foto:
+                    st.image(foto, caption="Bukti Komplain", use_column_width=True)
+                
+                if status == "Pending":
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Selesaikan", key=f"selesai_{idx}"):
+                            if konfirmasi_aksi("menandai komplain sebagai selesai"):
+                                ws_komplain.update_cell(idx + 2, 5, "Selesai")  # Kolom status
+                                st.success("Komplain ditandai sebagai selesai!")
+                                time.sleep(1)
+                                st.rerun()
+                    with col2:
+                        if st.button("❌ Tolak", key=f"tolak_komplain_{idx}"):
+                            if konfirmasi_aksi("menolak komplain ini"):
+                                ws_komplain.update_cell(idx + 2, 5, "Ditolak")  # Kolom status
+                                st.warning("Komplain ditolak!")
+                                time.sleep(1)
+                                st.rerun()
+    
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
+
+def verifikasi_booking():
+    """Halaman verifikasi booking"""
+    st.title("✅ Verifikasi Booking")
+    
+    try:
+        ws_booking = dapatkan_worksheet("Booking")
+        ws_user = dapatkan_worksheet("User")
+        ws_kamar = dapatkan_worksheet("Kamar")
+        
+        data_booking = ws_booking.get_all_records()
+        data_kamar = ws_kamar.get_all_records()
+        
+        if not data_booking:
+            st.info("Belum ada permintaan booking")
+            return
+            
+        for idx, b in enumerate(data_booking):
+            with st.expander(f"{b.get('nama', '')} - Kamar {b.get('kamar_dipilih', '')}"):
+                st.markdown(f"""
+                **👤 Nama:** {b.get('nama', '')}  
+                **📞 Kontak:** {b.get('no_hp_email', '')}  
+                **🏠 Kamar Dipilih:** {b.get('kamar_dipilih', '')}  
+                **📅 Waktu Booking:** {b.get('waktu_booking', '')}
+                """)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Setujui", key=f"setuju_{idx}"):
+                        if konfirmasi_aksi("menyetujui booking ini"):
+                            password_default = "12345678"
+                            hashed = bcrypt.hashpw(password_default.encode(), bcrypt.gensalt()).decode()
+                            
+                            with tampilkan_loading("Memproses..."):
+                                # Tambahkan user baru
+                                ws_user.append_row([
+                                    b['nama'], 
+                                    hashed, 
+                                    "penyewa", 
+                                    b['kamar_dipilih'], 
+                                    b['no_hp_email'],  # Simpan kontak
+                                    '',  # Deskripsi
+                                    '',  # Foto profil
+                                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # last_edit
+                                    'Belum'  # status_pembayaran
+                                ])
+                                
+                                # Update status kamar
+                                for i, k in enumerate(data_kamar):
+                                    if k['Nama'] == b['kamar_dipilih']:
+                                        ws_kamar.update_cell(i+2, 2, "Terisi")
+                                
+                                # Hapus booking
+                                ws_booking.delete_rows(idx+2)
+                            
+                            st.success(f"{b['nama']} disetujui dengan password default 12345678")
+                            time.sleep(1)
+                            st.rerun()
+                
+                with col2:
+                    if st.button("❌ Tolak", key=f"tolak_booking_{idx}"):
+                        if konfirmasi_aksi("menolak booking ini"):
+                            ws_booking.delete_rows(idx+2)
+                            st.warning("Booking ditolak!")
+                            time.sleep(1)
+                            st.rerun()
+    
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
+
+def profil_saya():
+    """Halaman profil pengguna"""
+    st.title("👤 Profil Saya")
+    
+    try:
+        if 'username' not in st.session_state:
+            st.error("Anda belum login")
+            return
+            
+        ws_user = dapatkan_worksheet("User")
+        data_user = ws_user.get_all_records()
+        user_idx = next(
+            (i for i, u in enumerate(data_user) 
+             if u.get('username') == st.session_state.username),
+            None
         )
-        st.plotly_chart(fig, use_container_width=True)
+        
+        if user_idx is None:
+            st.error("Profil tidak ditemukan")
+            return
+            
+        user_data = data_user[user_idx]
+        
+        # Tampilkan profil
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if user_data.get('foto_profil'):
+                st.image(user_data['foto_profil'], width=150, caption="Foto Profil")
+        
+        with col2:
+            st.markdown(f"""
+            **👤 Username:** {user_data.get('username', '')}  
+            **📛 Nama Lengkap:** {user_data.get('nama_lengkap', '')}  
+            **📞 No HP/Email:** {user_data.get('no_hp', '')}  
+            **🏠 Kamar:** {user_data.get('kamar', '-')}  
+            **📝 Deskripsi Diri:** {user_data.get('deskripsi', '')}
+            """)
+        
+        # Mode edit
+        if st.button("✏️ Edit Profil"):
+            st.session_state.mode_edit = True
+        
+        if st.session_state.get('mode_edit', False):
+            st.markdown("---")
+            st.subheader("Edit Profil")
+            
+            with st.form("form_edit_profil"):
+                nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap', ''))
+                kontak = st.text_input("No HP / Email", value=user_data.get('no_hp', ''))
+                deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi', ''))
+                foto = st.file_uploader("Foto Profil Baru", type=["jpg","jpeg","png"])
+                password_baru = st.text_input("Password Baru (kosongkan jika tidak ingin mengubah)", type="password")
+                konfirmasi_password = st.text_input("Konfirmasi Password Baru", type="password")
+                
+                submitted = st.form_submit_button("Simpan Perubahan")
+                if submitted:
+                    # Validasi input
+                    errors = []
+                    if kontak and not (validasi_nomor_hp(kontak) or validasi_email(kontak)):
+                        errors.append("Format kontak tidak valid (harus nomor HP atau email)")
+                    if password_baru and password_baru != konfirmasi_password:
+                        errors.append("Konfirmasi password tidak cocok")
+                    
+                    if errors:
+                        for error in errors:
+                            st.error(error)
+                    else:
+                        with tampilkan_loading("Menyimpan perubahan..."):
+                            # Upload foto baru jika ada
+                            link_foto = user_data.get('foto_profil', '')
+                            if foto:
+                                link_foto = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}")
+                            
+                            # Update password jika diubah
+                            if password_baru:
+                                hashed = bcrypt.hashpw(password_baru.encode(), bcrypt.gensalt()).decode()
+                                ws_user.update_cell(user_idx+2, 2, hashed)
+                            
+                            # Update field lainnya
+                            ws_user.update_cell(user_idx+2, 4, nama)  # nama_lengkap
+                            ws_user.update_cell(user_idx+2, 5, f"'{kontak}")  # no_hp
+                            ws_user.update_cell(user_idx+2, 6, deskripsi)  # deskripsi
+                            ws_user.update_cell(user_idx+2, 7, link_foto)  # foto_profil
+                            ws_user.update_cell(user_idx+2, 8, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))  # last_edit
+                            
+                            st.success("Profil berhasil diperbarui!")
+                            st.session_state.mode_edit = False
+                            time.sleep(1)
+                            st.rerun()
+                
+                if st.button("Batal"):
+                    st.session_state.mode_edit = False
+                    st.rerun()
     
-    # Tabel detail transaksi
-    st.subheader("📋 Detail Transaksi")
-    st.dataframe(df, hide_index=True, use_container_width=True)
-
-# ==============================================
-# 🚀 MAIN APP
-# ==============================================
-def main():
-    init_db()
-    auto_backup()
-    
-    if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-        login_module()
-    else:
-        st.sidebar.title(f"👋 Halo, {st.session_state.user}!")
-        st.sidebar.write(f"Role: **{st.session_state.role.upper()}**")
-        
-        menu_options = {
-            "📦 Produk": product_module,
-            "🛒 Transaksi": transaction_module,
-            "📊 Laporan": report_module
-        }
-        
-        selected = st.sidebar.radio("Menu", list(menu_options.keys()))
-        menu_options[selected]()
-        
-        if st.sidebar.button("🔒 Logout"):
-            st.session_state.clear()
-            st.rerun()
-
-if __name__ == "__main__":
-    main()
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
