@@ -193,12 +193,14 @@ def manajemen_pembayaran():
         nominal = p.get('nominal', '0')
         waktu = p.get('waktu', '-')
         bukti_link = p.get('bukti', '')
+        status = p.get('status', 'Belum Verifikasi')
 
-        with st.expander(f"{username} - {bulan} {tahun} - Rp{nominal}"):
+        with st.expander(f"{username} - {bulan} {tahun} - Rp{nominal} - {status}"):
             st.write(f"**Nama:** {username}")
             st.write(f"**Bulan/Tahun:** {bulan}/{tahun}")
             st.write(f"**Nominal:** Rp {int(nominal):,}")
             st.write(f"**Waktu Upload:** {waktu}")
+            st.write(f"**Status:** {status}")
 
             if bukti_link:
                 try:
@@ -216,23 +218,26 @@ def manajemen_pembayaran():
 
             with col1:
                 if st.button("✅ Verifikasi", key=f"verif_{idx}"):
+                    # Update status pembayaran di sheet Pembayaran
+                    pembayaran_ws.update_cell(idx + 2, 7, "Lunas")
+                    
+                    # Update status pembayaran di sheet User
                     user_ws = connect_gsheet().worksheet("User")
                     users = user_ws.get_all_records()
                     user_idx = next((i for i, u in enumerate(users) if u['username'] == username), None)
-
+                    
                     if user_idx is not None:
-                        user_ws.update_cell(user_idx + 2, 9, "Lunas")
-                        st.success(f"Pembayaran dari {username} berhasil diverifikasi.")
-
-                    pembayaran_ws.delete_rows(idx + 2)
+                        user_ws.update_cell(user_idx + 2, 10, "Lunas")
+                    
+                    st.success(f"Pembayaran dari {username} berhasil diverifikasi.")
                     st.rerun()
 
             with col2:
                 if st.button("❌ Tolak", key=f"tolak_{idx}"):
-                    pembayaran_ws.delete_rows(idx + 2)
+                    pembayaran_ws.update_cell(idx + 2, 7, "Ditolak")
                     st.warning(f"Pembayaran dari {username} ditolak.")
                     st.rerun()
-
+                    
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
 
@@ -244,23 +249,64 @@ def verifikasi_booking():
     kamar_data = kamar_ws.get_all_records()
 
     for idx, b in enumerate(bookings):
-        st.write(f"{b['nama']} mengajukan kamar {b['kamar_dipilih']}")
-        if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
-            password = "12345678"
-            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], '', '', '', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
-            for i, k in enumerate(kamar_data):
-                if k['Nama'] == b['kamar_dipilih']:
-                    kamar_ws.update_cell(i+2, 2, "Terisi")
-            booking_ws.delete_rows(idx+2)
-            st.success(f"{b['nama']} disetujui dengan password default 12345678.")
+        with st.expander(f"{b['nama']} - {b['kamar_dipilih']}"):
+            st.write(f"**Nama:** {b['nama']}")
+            st.write(f"**Kamar Dipilih:** {b['kamar_dipilih']}")
+            st.write(f"**Kontak:** {b.get('no_hp_email', '-')}")
+            st.write(f"**Waktu Booking:** {b.get('waktu_booking', '-')}")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
+                    # Buat akun user baru
+                    password = "12345678"
+                    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                    
+                    # Format data sesuai struktur sheet User
+                    new_user = [
+                        b['nama'],           # username
+                        hashed,               # password_hash
+                        "penyewa",            # role
+                        b['nama'],            # nama_lengkap
+                        b.get('no_hp_email', ''),  # no_hp
+                        b['kamar_dipilih'],   # kamar
+                        "",                   # deskripsi
+                        "",                   # foto_profil
+                        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # last_edit
+                        "Belum Bayar"         # status_pembayaran
+                    ]
+                    
+                    user_ws.append_row(new_user)
+                    
+                    # Update status kamar
+                    for i, k in enumerate(kamar_data):
+                        if k['Nama'] == b['kamar_dipilih']:
+                            kamar_ws.update_cell(i+2, 2, "Terisi")
+                    
+                    # Hapus dari daftar booking
+                    booking_ws.delete_rows(idx+2)
+                    
+                    st.success(f"{b['nama']} disetujui dengan password default 12345678.")
+                    st.rerun()
+            
+            with col2:
+                if st.button(f"Tolak {b['nama']}", key=f"tolak_{idx}"):
+                    booking_ws.delete_rows(idx+2)
+                    st.warning(f"Booking dari {b['nama']} ditolak.")
+                    st.rerun()
+                    
 def profil_saya():
     if 'profil_submenu' not in st.session_state:
         st.session_state.profil_submenu = None
 
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
-    idx = next(i for i, u in enumerate(users) if u['username'] == st.session_state.username)
+    idx = next((i for i, u in enumerate(users) if u['username'] == st.session_state.username), None)
+    
+    if idx is None:
+        st.error("User tidak ditemukan")
+        return
+        
     user_data = users[idx]
 
     st.header("👤 Profil Saya")
@@ -277,6 +323,7 @@ def profil_saya():
         <p><strong>Nama Lengkap:</strong> {user_data.get('nama_lengkap','')}</p>
         <p><strong>Nomor HP/Email:</strong> {user_data.get('no_hp','')}</p>
         <p><strong>Kamar:</strong> {user_data.get('kamar','-')}</p>
+        <p><strong>Status Pembayaran:</strong> {user_data.get('status_pembayaran','-')}</p>
         <p><strong>Deskripsi:</strong> {user_data.get('deskripsi','')}</p>
         """, unsafe_allow_html=True)
 
@@ -290,9 +337,12 @@ def profil_saya():
 
         if st.session_state.role != 'admin':
             if last_edit_str:
-                last_edit = datetime.strptime(last_edit_str, "%Y-%m-%d %H:%M:%S")
-                if datetime.now() - last_edit < timedelta(days=7):
-                    can_edit = False
+                try:
+                    last_edit = datetime.strptime(last_edit_str, "%Y-%m-%d %H:%M:%S")
+                    if datetime.now() - last_edit < timedelta(days=7):
+                        can_edit = False
+                except:
+                    pass
 
         if can_edit:
             nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
@@ -303,15 +353,25 @@ def profil_saya():
 
             if st.button("Simpan Perubahan"):
                 link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto_profil','')
-                user_ws.update_cell(idx+2, 4, nama)
-                user_ws.update_cell(idx+2, 5, f"'{kontak}")
-                user_ws.update_cell(idx+2, 6, deskripsi)
-                user_ws.update_cell(idx+2, 7, link)
-                user_ws.update_cell(idx+2, 8, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                
+                # Update data sesuai struktur sheet User
+                updates = {
+                    4: nama,                # D (nama_lengkap)
+                    5: f"'{kontak}",       # E (no_hp)
+                    6: deskripsi,           # F (deskripsi)
+                    7: link,                # G (foto_profil)
+                    8: datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # H (last_edit)
+                }
+                
+                for col, value in updates.items():
+                    user_ws.update_cell(idx + 2, col, value)
+                
                 if new_password:
                     hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-                    user_ws.update_cell(idx+2, 2, hashed)
+                    user_ws.update_cell(idx + 2, 2, hashed)  # B (password_hash)
+                
                 st.success("Profil berhasil diperbarui.")
                 st.session_state.profil_submenu = None
+                st.rerun()
         else:
             st.warning("Edit profil hanya bisa dilakukan 1x dalam seminggu.")
