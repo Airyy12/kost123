@@ -1,7 +1,8 @@
 import streamlit as st
+import pandas as pd
 from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
-from datetime import datetime
+from datetime import datetime, timedelta
 import bcrypt
 
 def run_admin(menu):
@@ -81,29 +82,6 @@ def manajemen():
         manajemen_penyewa()
     elif submenu == "Manajemen Laporan":
         manajemen_laporan()
-import pandas as pd
-
-def manajemen_laporan():
-    st.header("📄 Manajemen Laporan")
-
-    sheet_names = ["User", "Pembayaran", "Komplain", "Booking"]
-
-    for sheet in sheet_names:
-        st.subheader(f"Laporan {sheet}")
-
-        ws = connect_gsheet().worksheet(sheet)
-        data = ws.get_all_records()
-        df = pd.DataFrame(data)
-
-        st.dataframe(df)
-
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label=f"Download {sheet}.csv",
-            data=csv,
-            file_name=f"{sheet.lower()}_laporan.csv",
-            mime='text/csv'
-        )
 
 def manajemen_penyewa():
     st.title("👥 Manajemen Penyewa")
@@ -141,6 +119,28 @@ def manajemen_penyewa():
                     user_ws.delete_rows(idx+2)
                     st.warning("Penyewa dihapus. Silakan refresh halaman.")
 
+def manajemen_laporan():
+    st.header("📄 Manajemen Laporan")
+
+    sheet_names = ["User", "Pembayaran", "Komplain", "Booking"]
+
+    for sheet in sheet_names:
+        st.subheader(f"Laporan {sheet}")
+
+        ws = connect_gsheet().worksheet(sheet)
+        data = ws.get_all_records()
+        df = pd.DataFrame(data)
+
+        st.dataframe(df)
+
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"Download {sheet}.csv",
+            data=csv,
+            file_name=f"{sheet.lower()}_laporan.csv",
+            mime='text/csv'
+        )
+
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
 
@@ -164,8 +164,9 @@ def verifikasi_booking():
             st.success(f"{b['nama']} disetujui dengan password default 12345678.")
 
 def profil_saya():
-    if 'submenu' not in st.session_state:
-        st.session_state.submenu = None
+    if 'profil_submenu' not in st.session_state:
+        st.session_state.profil_submenu = None
+
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
     idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
@@ -189,9 +190,9 @@ def profil_saya():
         """, unsafe_allow_html=True)
 
     if st.button("Edit Profil"):
-        st.session_state.submenu = "edit_profil"
+        st.session_state.profil_submenu = "edit_profil"
 
-    if st.session_state.submenu == "edit_profil":
+    if st.session_state.profil_submenu == "edit_profil":
         st.subheader("Edit Profil")
         last_edit_str = user_data.get('last_edit', '')
         can_edit = True
@@ -220,7 +221,6 @@ def profil_saya():
                     hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
                     user_ws.update_cell(idx+2, 2, hashed)
                 st.success("Profil berhasil diperbarui.")
-                st.session_state.submenu = None
+                st.session_state.profil_submenu = None
         else:
             st.warning("Edit profil hanya bisa dilakukan 1x dalam seminggu.")
-
