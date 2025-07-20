@@ -4,22 +4,23 @@ from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime
 import bcrypt
 
-def run_admin():
-    st.sidebar.title("Admin Panel")
-    menu = st.sidebar.radio("Menu", ["Dashboard Admin", "Kelola Kamar", "Manajemen Penyewa", "Verifikasi Booking", "Logout"])
-
+def run_admin(menu):
     if menu == "Dashboard Admin":
-        dashboard_admin()
+        admin_dashboard()
     elif menu == "Kelola Kamar":
         kelola_kamar()
     elif menu == "Manajemen Penyewa":
         manajemen_penyewa()
     elif menu == "Verifikasi Booking":
         verifikasi_booking()
+    elif menu == "Profil Saya":
+        profil_saya()
     elif menu == "Logout":
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.experimental_rerun()
+        import streamlit as st
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
 
 def dashboard_admin():
     st.title("📊 Dashboard Admin")
