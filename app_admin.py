@@ -1,6 +1,6 @@
 import streamlit as st
 import bcrypt
-from datetime import datetime
+from datetime import datetime, timedelta
 from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
 
@@ -132,7 +132,7 @@ def login_page():
                 return
         st.error("Username atau Password salah.")
 
-# ---------- Penyewa ----------
+# ---------- Penyewa Dashboard ----------
 def penyewa_dashboard():
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
@@ -165,94 +165,61 @@ def penyewa_dashboard():
         </div>
         """, unsafe_allow_html=True)
 
-def pembayaran():
-    st.title("💸 Pembayaran Kost")
-    bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
-    tahun = st.text_input("Tahun", str(datetime.now().year))
-    bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg","jpeg","png"])
-    if st.button("Kirim Bukti"):
-        link = upload_to_cloudinary(bukti, f"Bayar_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}")
-        bayar_ws = connect_gsheet().worksheet("Pembayaran")
-        bayar_ws.append_row([st.session_state.username, bulan, tahun, link, str(datetime.now())])
-        st.success("Bukti pembayaran berhasil dikirim.")
-
-
-def komplain():
-    st.title("📢 Komplain")
-    isi = st.text_area("Tulis Komplain Anda")
-    bukti = st.file_uploader("Upload Foto (Opsional)", type=["jpg","jpeg","png"])
-    if st.button("Kirim Komplain"):
-        link = upload_to_cloudinary(bukti, f"Komplain_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}") if bukti else ""
-        komplain_ws = connect_gsheet().worksheet("Komplain")
-        komplain_ws.append_row([st.session_state.username, isi, link, str(datetime.now())])
-        st.success("Komplain berhasil dikirim.")
-
-
+# ---------- Profil Saya ----------
 def profil_saya():
-    st.title("👤 Profil Saya")
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
     idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
-    nama = st.text_input("Nama Lengkap", value=users[idx].get('nama_lengkap',''))
-    kontak = st.text_input("Nomor HP / Email", value=users[idx].get('kontak',''))
+    user_data = users[idx]
+
+    st.title("👤 Profil Saya")
+    nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
+    kontak = st.text_input("Nomor HP / Email", value=user_data.get('kontak',''))
     foto = st.file_uploader("Foto Profil", type=["jpg","jpeg","png"])
-    if st.button("Update Profil"):
-        link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else users[idx].get('foto','')
-        user_ws.update(f"C{idx+2}", nama)
-        user_ws.update(f"D{idx+2}", kontak)
-        user_ws.update(f"E{idx+2}", link)
-        st.success("Profil berhasil diperbarui.")
 
-# ---------- Admin ----------
-def admin_dashboard():
-    st.title("📊 Dashboard Admin")
-    st.markdown("<div class='info-card'>Selamat datang di Admin Panel Kost123.</div>", unsafe_allow_html=True)
+    can_edit = True
+    if user_data['role'] == 'penyewa':
+        last_edit = user_data.get('last_edit', '')
+        if last_edit:
+            last_time = datetime.strptime(last_edit, "%Y-%m-%d %H:%M:%S")
+            if datetime.now() - last_time < timedelta(days=7):
+                can_edit = False
 
+    if can_edit:
+        if st.button("Update Profil"):
+            link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto','')
+            user_ws.update(f"C{idx+2}", nama)
+            user_ws.update(f"D{idx+2}", kontak)
+            user_ws.update(f"E{idx+2}", link)
+            user_ws.update(f"I{idx+2}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            st.success("Profil berhasil diperbarui.")
+    else:
+        st.info("Update profil hanya bisa dilakukan seminggu sekali.")
 
-def kelola_kamar():
-    st.title("🛠️ Kelola Kamar")
-    kamar_ws = connect_gsheet().worksheet("Kamar")
-    data = kamar_ws.get_all_records()
-    for k in data:
-        st.markdown(f"<div class='info-card'>{k['Nama']} - {k['Status']} - Rp{k['Harga']}</div>", unsafe_allow_html=True)
+    if st.button("Ganti Sandi"):
+        st.session_state.menu = "Ganti Sandi"
 
-    nama = st.text_input("Nama Kamar")
-    harga = st.number_input("Harga", min_value=0)
-    deskripsi = st.text_area("Deskripsi")
-    foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
-    if st.button("Tambah Kamar"):
-        link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
-        kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
-        st.success("Kamar berhasil ditambahkan.")
-
-
-def verifikasi_booking():
-    st.title("✅ Verifikasi Booking")
-    booking_ws = connect_gsheet().worksheet("Booking")
-    user_ws = connect_gsheet().worksheet("User")
-    kamar_ws = connect_gsheet().worksheet("Kamar")
-    bookings = booking_ws.get_all_records()
-    kamar_data = kamar_ws.get_all_records()
-    for idx, b in enumerate(bookings):
-        st.write(f"{b['nama']} mengajukan kamar {b['kamar_dipilih']}")
-        if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
-            password = "12345678"
-            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], '', '', '', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
-            for i, k in enumerate(kamar_data):
-                if k['Nama'] == b['kamar_dipilih']:
-                    kamar_ws.update_cell(i+2, 2, "Terisi")
-            booking_ws.delete_rows(idx+2)
-            st.success(f"{b['nama']} disetujui dengan password default 12345678.")
-
-
-def manajemen_penyewa():
-    st.title("👥 Manajemen Penyewa")
+# ---------- Ganti Sandi ----------
+def ganti_sandi():
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
-    for u in users:
-        if u['role'] == 'penyewa':
-            st.markdown(f"<div class='info-card'>{u['username']} - {u.get('kamar','-')}</div>", unsafe_allow_html=True)
+    idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
+
+    st.title("🔑 Ganti Sandi")
+    old = st.text_input("Password Lama", type="password")
+    new = st.text_input("Password Baru", type="password")
+    konfirm = st.text_input("Konfirmasi Password Baru", type="password")
+
+    if st.button("Update Sandi"):
+        if bcrypt.checkpw(old.encode(), users[idx]['password_hash'].encode()):
+            if new == konfirm:
+                hashed = bcrypt.hashpw(new.encode(), bcrypt.gensalt()).decode()
+                user_ws.update(f"B{idx+2}", hashed)
+                st.success("Password berhasil diubah.")
+            else:
+                st.error("Konfirmasi password tidak cocok.")
+        else:
+            st.error("Password lama salah.")
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
@@ -266,12 +233,14 @@ else:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
     elif st.session_state.role == "admin":
-        if menu == "Dashboard Admin": admin_dashboard()
-        elif menu == "Kelola Kamar": kelola_kamar()
-        elif menu == "Verifikasi Booking": verifikasi_booking()
-        elif menu == "Manajemen Penyewa": manajemen_penyewa()
+        if menu == "Dashboard Admin": pass  # admin_dashboard()
+        elif menu == "Kelola Kamar": pass  # kelola_kamar()
+        elif menu == "Verifikasi Booking": pass  # verifikasi_booking()
+        elif menu == "Manajemen Penyewa": pass  # manajemen_penyewa()
     else:
         if menu == "Dashboard": penyewa_dashboard()
-        elif menu == "Pembayaran": pembayaran()
-        elif menu == "Komplain": komplain()
+        elif menu == "Pembayaran": pass  # pembayaran()
+        elif menu == "Komplain": pass  # komplain()
         elif menu == "Profil Saya": profil_saya()
+        elif menu == "Ganti Sandi": ganti_sandi()
+
