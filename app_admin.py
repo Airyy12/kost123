@@ -99,25 +99,43 @@ def verifikasi_booking():
     booking_ws = sheet.worksheet("Booking")
     user_ws = sheet.worksheet("User")
     kamar_ws = sheet.worksheet("Kamar")
+
     data = booking_ws.get_all_records()
     kamar_data = kamar_ws.get_all_records()
+
+    # List untuk menyimpan booking yang mau dihapus setelah loop
+    rows_to_delete = []
 
     for idx, b in enumerate(data):
         st.write(f"**{b['nama']}** mengajukan kamar **{b['kamar_dipilih']}**")
         st.write(f"Kontak: {b['no_hp_email']}")
 
         if st.button(f"Setujui {b['nama']}", key=f"setuju{idx}"):
-            password = "12345678"
-            hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-            user_ws.append_row([b['nama'], hashed, "penyewa"])
+            try:
+                password = "12345678"  # Default password
+                hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                user_ws.append_row([b['nama'], hashed, "penyewa"])
 
-            for i, k in enumerate(kamar_data):
-                if k['Nama'] == b['kamar_dipilih']:
-                    kamar_ws.update_cell(i+2, 2, "Terisi")
+                # Update status kamar
+                for i, k in enumerate(kamar_data):
+                    if k['Nama'] == b['kamar_dipilih']:
+                        kamar_ws.update_cell(i+2, 2, "Terisi")  # Kolom Status
 
-            booking_ws.delete_rows(idx+2)
-            st.success(f"{b['nama']} disetujui. Password default: {password}")
-            st.rerun()
+                # Tandai baris untuk dihapus nanti
+                rows_to_delete.append(idx + 2)
+
+                st.success(f"{b['nama']} disetujui. Password default: {password}")
+
+            except Exception as e:
+                st.error(f"Gagal memproses booking: {e}")
+
+    # Setelah semua loop selesai baru hapus
+    for row in sorted(rows_to_delete, reverse=True):
+        booking_ws.delete_rows(row)
+
+    if rows_to_delete:
+        st.rerun()
+
 
 def manajemen_penyewa():
     st.subheader("👥 Manajemen Penyewa")
