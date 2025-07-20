@@ -70,15 +70,9 @@ body {
 .stButton>button:hover {
     background-color: #505050;
 }
-.label-align {
-    display: inline-block;
-    width: 150px;
-    font-weight: bold;
-}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Session Init ----------
 if 'login_status' not in st.session_state:
     st.session_state.login_status = False
     st.session_state.role = None
@@ -243,16 +237,32 @@ def komplain():
         st.success("Komplain berhasil dikirim.")
 
 # ---------- Pembayaran ----------
+
 def pembayaran():
     st.title("💸 Pembayaran Kost")
     bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
     tahun = st.text_input("Tahun", str(datetime.now().year))
-    bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg","jpeg","png"])
+    bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg","jpeg","png"], key="bukti_transfer")
     if st.button("Kirim Bukti"):
-        link = upload_to_cloudinary(bukti, f"Bayar_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}")
-        bayar_ws = connect_gsheet().worksheet("Pembayaran")
-        bayar_ws.append_row([st.session_state.username, bulan, tahun, link, str(datetime.now())])
-        st.success("Bukti pembayaran berhasil dikirim.")
+        if bukti is not None:
+            link = upload_to_cloudinary(bukti, f"Bayar_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}")
+            bayar_ws = connect_gsheet().worksheet("Pembayaran")
+            bayar_ws.append_row([st.session_state.username, bulan, tahun, link, str(datetime.now())])
+            st.success("Bukti pembayaran berhasil dikirim.")
+            st.session_state["bukti_transfer"] = None
+# Tambahan Fitur Komplain (Laporan)
+
+def komplain():
+    st.title("📢 Komplain")
+    isi = st.text_area("Tulis Komplain Anda", key="komplain_text")
+    bukti = st.file_uploader("Upload Foto (Opsional)", type=["jpg","jpeg","png"], key="bukti_komplain")
+    if st.button("Kirim Komplain"):
+        link = upload_to_cloudinary(bukti, f"Komplain_{st.session_state.username}_{datetime.now().strftime('%Y%m%d%H%M')}") if bukti else ""
+        komplain_ws = connect_gsheet().worksheet("Komplain")
+        komplain_ws.append_row([st.session_state.username, isi, link, str(datetime.now())])
+        st.success("Komplain berhasil dikirim.")
+        st.session_state["komplain_text"] = ""
+        st.session_state["bukti_komplain"] = None
 
 # ---------- Admin Dashboard ----------
 def admin_dashboard():
