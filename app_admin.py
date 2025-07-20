@@ -523,7 +523,11 @@ def manajemen_pembayaran():
                         if st.button("✅ Verifikasi", key=f"verif_{idx}", use_container_width=True):
                             # Update status di sheet Pembayaran
                             all_payments = pembayaran_ws.get_all_values()
-                            row_num = next((i+1 for i, row in enumerate(all_payments) if row[0] == bayar['username'] and row[3] == bayar['bulan'] and row[4] == bayar['tahun'], None)
+                            row_num = next(
+                                (i+1 for i, row in enumerate(all_payments)
+                                 if row[0] == bayar['username'] and row[3] == bayar['bulan'] and row[4] == bayar['tahun']),
+                                None
+                            )
                             if row_num:
                                 pembayaran_ws.update_cell(row_num, 7, "Lunas")
                             
@@ -540,7 +544,11 @@ def manajemen_pembayaran():
                     if bayar['status'] != 'Ditolak':
                         if st.button("❌ Tolak", key=f"tolak_{idx}", use_container_width=True):
                             all_payments = pembayaran_ws.get_all_values()
-                            row_num = next((i+1 for i, row in enumerate(all_payments) if row[0] == bayar['username'] and row[3] == bayar['bulan'] and row[4] == bayar['tahun'], None)
+                            row_num = next(
+                                (i+1 for i, row in enumerate(all_payments)
+                                 if row[0] == bayar['username'] and row[3] == bayar['bulan'] and row[4] == bayar['tahun']),
+                                None
+                            )
                             if row_num:
                                 pembayaran_ws.update_cell(row_num, 7, "Ditolak")
                             st.warning("Pembayaran ditolak!")
@@ -599,7 +607,11 @@ def manajemen_komplain():
                         if st.form_submit_button("Kirim Tanggapan"):
                             # Update status komplain
                             all_komplain = komplain_ws.get_all_values()
-                            row_num = next((i+1 for i, row in enumerate(all_komplain) if row[0] == komplain['username'] and row[3] == komplain['waktu'], None)
+                            row_num = next(
+                                (i+1 for i, row in enumerate(all_komplain)
+                                 if row[0] == komplain['username'] and row[3] == komplain['waktu']),
+                                None
+                            )
                             if row_num:
                                 komplain_ws.update_cell(row_num, 5, "Sudah Ditanggapi")
                                 komplain_ws.update_cell(row_num, 6, tanggapan)
@@ -614,7 +626,11 @@ def manajemen_komplain():
                 # Tombol hapus
                 if st.button("🗑️ Hapus Komplain", key=f"hapus_{idx}"):
                     all_komplain = komplain_ws.get_all_values()
-                    row_num = next((i+1 for i, row in enumerate(all_komplain) if row[0] == komplain['username'] and row[3] == komplain['waktu'], None)
+                    row_num = next(
+                        (i+1 for i, row in enumerate(all_komplain)
+                         if row[0] == komplain['username'] and row[3] == komplain['waktu']),
+                        None
+                    )
                     if row_num:
                         komplain_ws.delete_rows(row_num)
                         st.warning("Komplain berhasil dihapus!")
