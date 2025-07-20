@@ -76,12 +76,15 @@ def kelola_kamar():
 def manajemen():
     st.title("🗂️ Manajemen")
 
-    submenu = st.selectbox("Pilih Submenu", ["Manajemen Penyewa", "Manajemen Laporan"])
+    submenu = st.selectbox("Pilih Submenu", ["Manajemen Penyewa", "Manajemen Pembayaran", "Manajemen Komplain"])
 
     if submenu == "Manajemen Penyewa":
         manajemen_penyewa()
-    elif submenu == "Manajemen Laporan":
-        manajemen_laporan()
+    elif submenu == "Manajemen Pembayaran":
+        manajemen_pembayaran()
+    elif submenu == "Manajemen Komplain":
+        manajemen_laporan()  # Jika sebelumnya sudah ada fitur komplain interaktif
+
 
 def manajemen_penyewa():
     st.title("👥 Manajemen Penyewa")
