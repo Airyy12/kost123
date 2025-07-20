@@ -123,48 +123,49 @@ def manajemen_penyewa():
 def manajemen_komplain():
     st.title("📢 Manajemen Komplain")
 
-    komplain_ws = connect_gsheet().worksheet("Komplain")
+    sheet = connect_gsheet()
+    komplain_ws = sheet.worksheet("Komplain")
     komplain_data = komplain_ws.get_all_records()
 
     if not komplain_data:
         st.info("Belum ada data komplain.")
         return
 
-    # Filter hanya komplain yang belum selesai atau ditolak
-    komplain_data = [k for k in komplain_data if k.get('status', '').lower() not in ['selesai', 'ditolak']]
-
-    st.markdown("### Daftar Komplain Belum Selesai")
     for idx, k in enumerate(komplain_data):
-        username = k.get('username', '-')
-        masalah = k.get('masalah', '-')
-        deskripsi = k.get('deskripsi', '-')
-        waktu = k.get('waktu', '-')
-        foto = k.get('link_foto', '')
-        status = k.get('status', '-')
+        username = k.get("username", "-")
+        bulan = k.get("bulan", "-")
+        tahun = k.get("tahun", "-")
+        isi = k.get("komplain", "-")
+        foto = k.get("foto", "")
+        status = k.get("status", "").lower()
 
-        with st.container():
-            st.markdown(f"#### 📝 Komplain dari **{username}**")
-            st.write(f"**Masalah:** {masalah}")
-            st.write(f"**Deskripsi:** {deskripsi}")
-            st.write(f"**Waktu:** {waktu}")
+        # Skip jika status komplain sudah "selesai" atau "ditolak"
+        if status in ["selesai", "ditolak"]:
+            continue
+
+        with st.expander(f"{username} - {bulan} {tahun}"):
+            st.markdown(f"""
+            **👤 Nama:** {username}  
+            **📅 Bulan/Tahun:** {bulan} / {tahun}  
+            **💬 Komplain:** {isi}
+            """)
+
             if foto:
-                st.image(foto, use_container_width=True, caption="Lampiran Foto")
+                st.image(foto, caption="Bukti Komplain", use_container_width=True)
 
             col1, col2 = st.columns(2)
+
             with col1:
-                if st.button("✅ Selesai", key=f"selesai_{idx}"):
-                    komplain_ws.update_cell(idx+2, 5, "Selesai")  # Kolom E = status
-                    st.success("Komplain ditandai sebagai selesai.")
+                if st.button("✅ Selesaikan", key=f"selesai_{idx}"):
+                    komplain_ws.update_cell(idx + 2, 6, "Selesai")  # Kolom status
+                    st.success(f"Komplain dari {username} telah diselesaikan.")
                     st.experimental_rerun()
 
             with col2:
-                if st.button("❌ Tolak", key=f"tolak_{idx}"):
-                    komplain_ws.update_cell(idx+2, 5, "Ditolak")  # Kolom E = status
-                    st.warning("Komplain telah ditolak.")
+                if st.button("❌ Tolak", key=f"tolak_komplain_{idx}"):
+                    komplain_ws.update_cell(idx + 2, 6, "Ditolak")  # Kolom status
+                    st.warning(f"Komplain dari {username} telah ditolak.")
                     st.experimental_rerun()
-
-            st.markdown("---")
-
 
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
