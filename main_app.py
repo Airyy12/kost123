@@ -9,51 +9,19 @@ st.set_page_config(page_title="Kost123 Dashboard", layout="wide")
 # ---------- Global CSS ----------
 st.markdown("""
 <style>
-body {
-    background-color: #1e1e1e;
-    color: #f0f0f0;
-    font-family: 'Segoe UI', sans-serif;
-}
+body { background-color: #1e1e1e; color: #f0f0f0; font-family: 'Segoe UI', sans-serif; }
 [data-testid="stSidebar"] > div:first-child {
-    background: linear-gradient(145deg, #2c2c2c, #3a3a3a);
-    padding: 25px;
-    border-radius: 12px;
+    background: linear-gradient(145deg, #2c2c2c, #3a3a3a); padding: 25px; border-radius: 12px;
 }
-.sidebar-title {
-    font-size: 26px;
-    font-weight: bold;
-    color: #FFFFFF;
-    margin-bottom: 30px;
-    text-align: center;
-}
-.menu-item {
-    color: #E0E0E0;
-    padding: 14px 25px;
-    margin-bottom: 12px;
-    border-radius: 10px;
-    transition: all 0.3s ease;
-    font-size: 18px;
-}
-.menu-item:hover {
-    background-color: #5a5a5a;
-    cursor: pointer;
-}
-.menu-selected {
-    background-color: #6d6d6d;
-    font-weight: bold;
-    box-shadow: inset 0 0 5px #00000055;
-}
-.info-card {
-    background: rgba(60,60,60,0.5);
-    padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
+.sidebar-title { font-size: 26px; font-weight: bold; color: #FFFFFF; margin-bottom: 30px; text-align: center; }
+.menu-item { color: #E0E0E0; padding: 14px 25px; margin-bottom: 12px; border-radius: 10px; transition: all 0.3s ease; font-size: 18px; }
+.menu-item:hover { background-color: #5a5a5a; cursor: pointer; }
+.menu-selected { background-color: #6d6d6d; font-weight: bold; box-shadow: inset 0 0 5px #00000055; }
+.info-card { background: rgba(60,60,60,0.5); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Session State ----------
+# ---------- Session State Initialization ----------
 if 'login_status' not in st.session_state:
     st.session_state.login_status = False
     st.session_state.role = None
@@ -83,12 +51,13 @@ def sidebar_menu():
                 ("Logout", "🚪 Logout")
             ]
 
-        for key, label in menu_options:
-            style = "menu-item"
-            if st.session_state.menu == key:
-                style += " menu-selected"
-            if st.button(label, key=key):
-                st.session_state.menu = key
+        for value, label in menu_options:
+            is_selected = st.session_state.menu == value
+            button_style = "menu-item"
+            if is_selected:
+                button_style += " menu-selected"
+            if st.button(label, key=f"menu_{value}"):
+                st.session_state.menu = value
 
 # ---------- Login ----------
 def login_page():
@@ -103,17 +72,22 @@ def login_page():
                 st.session_state.login_status = True
                 st.session_state.username = username
                 st.session_state.role = u['role']
-                st.session_state.menu = "Dashboard Admin" if u['role']=='admin' else "Dashboard"
-                return
+                # Set menu awal saat login
+                st.session_state.menu = "Dashboard Admin" if u['role'] == 'admin' else "Dashboard"
+                st.experimental_rerun()
         st.error("Username atau Password salah.")
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
     login_page()
 else:
+    # Pastikan menu tidak None
+    if st.session_state.menu is None:
+        st.session_state.menu = "Dashboard Admin" if st.session_state.role == "admin" else "Dashboard"
+
     sidebar_menu()
+
     if st.session_state.role == "admin":
         run_admin(st.session_state.menu)
     else:
         run_penyewa(st.session_state.menu)
- 
