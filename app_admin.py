@@ -1,7 +1,7 @@
 import streamlit as st
 import bcrypt
 from sheets import connect_gsheet
-from drive import upload_to_drive
+from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime
 import re
 
@@ -50,6 +50,8 @@ def kelola_kamar():
         with col1:
             st.write(f"**{k['Nama']}** - {k['Status']} - Rp{k['Harga']}")
             st.text(k['Deskripsi'])
+            if k['Link Foto']:
+                st.image(k['Link Foto'], width=150)
         with col2:
             if st.button(f"Hapus {k['Nama']}", key=f"hapus_{idx}"):
                 kamar_ws.delete_rows(idx+2)
@@ -64,7 +66,7 @@ def kelola_kamar():
     foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
     if st.button("Tambah Kamar"):
         safe_nama = re.sub(r'[^a-zA-Z0-9_\-]', '_', nama)
-        link_foto = upload_to_drive(foto, f"{safe_nama}.jpg") if foto else ""
+        link_foto = upload_to_cloudinary(foto, f"{safe_nama}") if foto else ""
         kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link_foto])
         st.success("Kamar berhasil ditambahkan.")
         st.rerun()
@@ -110,7 +112,7 @@ def fitur_penyewa(username):
             if not bulan:
                 st.warning("Mohon isi keterangan bulan/tahun pembayaran.")
             else:
-                link = upload_to_drive(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg")
+                link = upload_to_cloudinary(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
                 bayar_ws = connect_gsheet().worksheet("Pembayaran")
                 bayar_ws.append_row([username, link, bulan, str(datetime.now())])
                 st.success("Bukti pembayaran berhasil dikirim.")
