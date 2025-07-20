@@ -27,59 +27,87 @@ from datetime import datetime
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
 
-    # Load semua data
-    df_komplain = load_sheet_data('komplain')
-    df_booking = load_sheet_data('booking')
-    df_pembayaran = load_sheet_data('pembayaran')
+    # Load data dengan error handling
+    try:
+        df_komplain = load_sheet_data('komplain')
+        df_booking = load_sheet_data('booking')
+        df_pembayaran = load_sheet_data('pembayaran')
+        
+        # Debug: Tampilkan struktur data
+        st.write("Struktur Data:")
+        st.write("- Komplain:", df_komplain.columns.tolist())
+        st.write("- Booking:", df_booking.columns.tolist())
+        st.write("- Pembayaran:", df_pembayaran.columns.tolist())
+        
+    except Exception as e:
+        st.error(f"Gagal memuat data: {str(e)}")
+        return
 
-    # Pastikan tidak ada kolom yang salah format
-    for df in [df_komplain, df_booking, df_pembayaran]:
-        df.columns = df.columns.str.strip()
-
+    # Section 1: Komplain Terbaru
     st.markdown("### 🛠️ Komplain Terbaru")
     if df_komplain.empty:
         st.info("Belum ada komplain.")
     else:
-        komplain_terbaru = df_komplain.sort_values("waktu", ascending=False).head(5)
-        for _, row in komplain_terbaru.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
-                    <strong>📅 {row['waktu']}</strong><br>
-                    🧑 <strong>{row['username']}</strong><br>
-                    📝 {row['isi_komplain']}
-                </div>
-                """, unsafe_allow_html=True)
+        # Cek kolom yang diperlukan
+        required_cols = {'username', 'isi_komplain', 'waktu'}
+        if not required_cols.issubset(df_komplain.columns):
+            st.error(f"Kolom yang dibutuhkan tidak ditemukan: {required_cols - set(df_komplain.columns)}")
+        else:
+            # Format dan tampilkan komplain
+            komplain_terbaru = df_komplain.sort_values("waktu", ascending=False).head(5)
+            for _, row in komplain_terbaru.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
+                        <strong>📅 {row.get('waktu', '')}</strong><br>
+                        🧑 <strong>{row.get('username', '')}</strong><br>
+                        📝 {row.get('isi_komplain', '')}
+                    </div>
+                    """, unsafe_allow_html=True)
 
+    # Section 2: Booking Terbaru
     st.markdown("### 📝 Booking Terbaru")
     if df_booking.empty:
         st.info("Belum ada data booking.")
     else:
-        booking_terbaru = df_booking.sort_values("waktu_booking", ascending=False).head(5)
-        for _, b in booking_terbaru.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color:#dbeafe; padding:10px; border-radius:10px; margin-bottom:10px;">
-                    <strong>📅 {b['waktu_booking']}</strong><br>
-                    🧑 <strong>{b['nama']}</strong> memesan kamar <strong>{b['kamar_dipilih']}</strong>
-                </div>
-                """, unsafe_allow_html=True)
+        # Cek kolom yang diperlukan
+        required_cols = {'nama', 'kamar_dipilih', 'waktu_booking'}
+        if not required_cols.issubset(df_booking.columns):
+            st.error(f"Kolom yang dibutuhkan tidak ditemukan: {required_cols - set(df_booking.columns)}")
+        else:
+            # Format dan tampilkan booking
+            booking_terbaru = df_booking.sort_values("waktu_booking", ascending=False).head(5)
+            for _, row in booking_terbaru.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background-color:#dbeafe; padding:10px; border-radius:10px; margin-bottom:10px;">
+                        <strong>📅 {row.get('waktu_booking', '')}</strong><br>
+                        🧑 <strong>{row.get('nama', '')}</strong> memesan kamar <strong>{row.get('kamar_dipilih', '')}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
 
+    # Section 3: Pembayaran Terbaru
     st.markdown("### 💵 Pembayaran Terbaru")
     if df_pembayaran.empty:
         st.info("Belum ada data pembayaran.")
     else:
-        pembayaran_terbaru = df_pembayaran.sort_values("waktu", ascending=False).head(5)
-        for _, p in pembayaran_terbaru.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px;">
-                    <strong>📅 {p['waktu']}</strong><br>
-                    🧑 <strong>{p['username']}</strong> 
-                    💸 Total: Rp {p['nominal']}
-                </div>
-                """, unsafe_allow_html=True)
-                
+        # Cek kolom yang diperlukan
+        required_cols = {'username', 'nominal', 'waktu'}
+        if not required_cols.issubset(df_pembayaran.columns):
+            st.error(f"Kolom yang dibutuhkan tidak ditemukan: {required_cols - set(df_pembayaran.columns)}")
+        else:
+            # Format dan tampilkan pembayaran
+            pembayaran_terbaru = df_pembayaran.sort_values("waktu", ascending=False).head(5)
+            for _, row in pembayaran_terbaru.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background-color:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px;">
+                        <strong>📅 {row.get('waktu', '')}</strong><br>
+                        🧑 <strong>{row.get('username', '')}</strong> 
+                        💸 Total: Rp {int(row.get('nominal', 0)):,}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
 
