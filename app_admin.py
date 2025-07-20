@@ -121,59 +121,53 @@ def manajemen_penyewa():
                     st.experimental_rerun()
 
 def manajemen_komplain():
-    st.subheader("📢 Manajemen Komplain")
+    st.title("📢 Manajemen Komplain")
 
     komplain_ws = connect_gsheet().worksheet("Komplain")
-    data = komplain_ws.get_all_records()
-    df = pd.DataFrame(data)
+    komplain_data = komplain_ws.get_all_records()
 
-    if df.empty:
-        st.info("Belum ada komplain.")
+    if not komplain_data:
+        st.info("Belum ada data komplain.")
         return
 
-    # Pastikan kolom 'status' ada
-    header = komplain_ws.row_values(1)
-    if 'status' not in header:
-        header.append('status')
-        komplain_ws.update('A1', [header])
-        df['status'] = ''
-    elif 'status' not in df.columns:
-        df['status'] = ''
+    # Tampilkan hanya komplain yang belum selesai/diproses
+    komplain_data = [k for k in komplain_data if k.get('status', '').lower() not in ['selesai', 'ditolak']]
 
-    # Filter hanya komplain belum selesai
-    df_belum = df[df['status'].str.lower() != 'selesai']
+    for idx, k in enumerate(komplain_data):
+        username = k.get('username', '-')
+        masalah = k.get('masalah', '-')
+        deskripsi = k.get('deskripsi', '-')
+        waktu = k.get('waktu', '-')
+        link_foto = k.get('link_foto', '')
 
-    if df_belum.empty:
-        st.success("Semua komplain telah diselesaikan.")
-        return
+        with st.expander(f"{masalah} ({username})"):
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.markdown(f"**Nama Pengguna:** {username}")
+                st.markdown(f"**Waktu Komplain:** {waktu}")
+                st.markdown(f"**Masalah:** {masalah}")
+                st.markdown("**Deskripsi Komplain:**")
+                st.write(deskripsi)
+            
+            with col2:
+                if link_foto:
+                    st.image(link_foto, use_container_width=True, caption="Lampiran Foto")
 
-    pilihan = {
-        f"{row['isi_komplain']} ({row['username']})": idx
-        for idx, row in df_belum.iterrows()
-    }
+                colA, colB = st.columns(2)
+                with colA:
+                    if st.button("✅ Selesai", key=f"selesai_{idx}"):
+                        row_index = idx + 2
+                        komplain_ws.update_cell(row_index, 5, "Selesai")  # Kolom E = status
+                        st.success("Komplain telah ditandai selesai.")
+                        st.experimental_rerun()
 
-    selected_label = st.selectbox("📌 Pilih Komplain Belum Selesai:", list(pilihan.keys()))
-
-    if selected_label:
-        selected_idx = pilihan[selected_label]
-        selected_row = df_belum.loc[selected_idx]
-
-        st.markdown(f"### ✏️ Komplain dari **{selected_row['username']}**")
-        st.write(f"🗒️ **Isi:** {selected_row['isi_komplain']}")
-        st.write(f"📅 **Waktu:** {selected_row['waktu']}")
-
-        if selected_row['link_foto']:
-            st.image(selected_row['link_foto'], use_column_width=True)
-        else:
-            st.caption("Tidak ada foto terlampir.")
-
-        if st.button("✅ Tandai Komplain Ini Selesai"):
-            # Update ke baris yang benar
-            row_number = selected_idx + 2  # +2 karena header di baris 1
-            col_index = header.index('status') + 1  # kolom dimulai dari 1
-            komplain_ws.update_cell(row_number, col_index, 'selesai')
-            st.success("Komplain telah ditandai selesai.")
-            st.experimental_rerun()
+                with colB:
+                    if st.button("❌ Tolak", key=f"tolak_{idx}"):
+                        row_index = idx + 2
+                        komplain_ws.update_cell(row_index, 5, "Ditolak")  # Kolom E = status
+                        st.warning("Komplain telah ditolak.")
+                        st.experimental_rerun()
 
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
