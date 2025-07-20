@@ -55,7 +55,7 @@ def admin_dashboard():
     if df_booking.empty:
         st.info("Belum ada data booking.")
     else:
-        booking_terbaru = df_booking.sort_values("waktu", ascending=False).head(5)
+        booking_terbaru = df_booking.sort_values("waktu_booking", ascending=False).head(5)
         for _, b in booking_terbaru.iterrows():
             with st.container():
                 st.markdown(f"""
