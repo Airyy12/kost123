@@ -47,7 +47,7 @@ def admin_dashboard():
                 <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {row['waktu']}</strong><br>
                     🧑 <strong>{row['username']}</strong><br>
-                    📝 {row['komplain']}
+                    📝 {row['isi_komplain']}
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -60,7 +60,7 @@ def admin_dashboard():
             with st.container():
                 st.markdown(f"""
                 <div style="background-color:#dbeafe; padding:10px; border-radius:10px; margin-bottom:10px;">
-                    <strong>📅 {b['waktu']}</strong><br>
+                    <strong>📅 {b['waktu_booking']}</strong><br>
                     🧑 <strong>{b['username']}</strong> memesan kamar <strong>{b['kamar_dipilih']}</strong>
                 </div>
                 """, unsafe_allow_html=True)
@@ -75,7 +75,7 @@ def admin_dashboard():
                 st.markdown(f"""
                 <div style="background-color:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px;">
                     <strong>📅 {p['waktu']}</strong><br>
-                    🧑 <strong>{p['username']}</strong> membayar untuk kamar <strong>{p['nama_kamar']}</strong><br>
+                    🧑 <strong>{p['username']}</strong> 
                     💸 Total: Rp {p['jumlah_bayar']}
                 </div>
                 """, unsafe_allow_html=True)
