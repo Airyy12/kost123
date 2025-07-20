@@ -124,29 +124,53 @@ def manajemen_komplain():
     st.subheader("📢 Manajemen Komplain")
 
     komplain_ws = connect_gsheet().worksheet("Komplain")
-    komplain_data = komplain_ws.get_all_records()
-    df_komplain = pd.DataFrame(komplain_data)
+    data = komplain_ws.get_all_records()
+    df = pd.DataFrame(data)
 
-    if df_komplain.empty:
-        st.info("Belum ada komplain yang masuk.")
+    if df.empty:
+        st.info("Belum ada komplain.")
         return
 
-    # Tampilkan hanya komplain yang belum diselesaikan
-    if "status" not in df_komplain.columns:
-        df_komplain["status"] = ""  # kolom status default jika belum ada
+    # Tambahkan kolom status jika belum ada
+    if 'status' not in df.columns:
+        df['status'] = ''
+        komplain_ws.update('E1', 'status')  # asumsi kolom E kosong
 
-    unresolved = df_komplain[df_komplain["status"] != "selesai"]
+    # Filter hanya komplain belum selesai
+    df_belum = df[df['status'].str.lower() != 'selesai']
 
-    st.write("### Komplain Belum Diselesaikan")
-    st.dataframe(unresolved)
+    if df_belum.empty:
+        st.success("Semua komplain telah diselesaikan.")
+        return
 
-    selected_index = st.number_input("Pilih indeks komplain untuk ditandai 'selesai'", min_value=0, max_value=len(unresolved) - 1, step=1)
+    # Buat pilihan drop down
+    pilihan = {
+        f"{row['isi_komplain']} ({row['username']})": idx
+        for idx, row in df_belum.iterrows()
+    }
 
-    if st.button("Tandai Selesai"):
-        idx = unresolved.index[selected_index]
-        df_komplain.at[idx, "status"] = "selesai"
-        komplain_ws.update([df_komplain.columns.values.tolist()] + df_komplain.values.tolist())
-        st.success("Komplain telah ditandai selesai.")
+    selected_label = st.selectbox("📌 Pilih Komplain Belum Selesai:", list(pilihan.keys()))
+
+    if selected_label:
+        selected_idx = pilihan[selected_label]
+        selected_row = df_belum.loc[selected_idx]
+
+        st.markdown(f"### ✏️ Komplain dari **{selected_row['username']}**")
+        st.write(f"🗒️ **Isi:** {selected_row['isi_komplain']}")
+        st.write(f"📅 **Waktu:** {selected_row['waktu']}")
+
+        if selected_row['link_foto']:
+            st.image(selected_row['link_foto'], use_column_width=True)
+        else:
+            st.caption("Tidak ada foto terlampir.")
+
+        # Tombol tandai selesai
+        if st.button("✅ Tandai Komplain Ini Selesai"):
+            # Update status di worksheet
+            row_number = selected_idx + 2  # header = row 1
+            komplain_ws.update_cell(row_number, df.columns.get_loc('status') + 1, 'selesai')
+            st.success("Komplain telah ditandai selesai.")
+            st.experimental_rerun()
 
 def manajemen_pembayaran():
     st.title("💸 Manajemen Pembayaran")
