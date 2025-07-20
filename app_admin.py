@@ -44,7 +44,7 @@ body {
     box-shadow: inset 0 0 5px #00000055;
 }
 .info-card {
-    background: rgba(60,60,60,0.5);
+    background: rgba(139,0,0,0.5);
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
@@ -61,6 +61,14 @@ body {
 }
 .stButton>button:hover {
     background-color: #505050;
+}
+.status-box {
+    background: rgba(139,0,0,0.5);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 10px;
+    font-size: 16px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -120,18 +128,19 @@ def login_page():
 
 # ---------- Penyewa ----------
 def penyewa_dashboard():
-    st.title("📊 Dashboard Penyewa")
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
     user_data = next(u for u in users if u['username']==st.session_state.username)
 
+    st.title(f"Selamat Datang, {user_data.get('nama_lengkap', user_data['username'])}")
+
     st.markdown(f"""
-    <div class="info-card">
-        <h4>Nama: {user_data.get('nama_lengkap', user_data['username'])}</h4>
-        <p>Kamar: {user_data.get('kamar','Belum Terdaftar')}</p>
-        <p>Status Pembayaran: {user_data.get('Status Pembayaran','Belum Ada Data')}</p>
+    <div class="status-box">
+        <b>No Kamar:</b> {user_data.get('kamar','Belum Terdaftar')}<br>
+        <b>Status Pembayaran:</b> {user_data.get('Status Pembayaran','Belum Ada Data')}
     </div>
     """, unsafe_allow_html=True)
+
 
 def pembayaran():
     st.title("💸 Pembayaran Kost")
@@ -144,6 +153,7 @@ def pembayaran():
         bayar_ws.append_row([st.session_state.username, bulan, tahun, link, str(datetime.now())])
         st.success("Bukti pembayaran berhasil dikirim.")
 
+
 def komplain():
     st.title("📢 Komplain")
     isi = st.text_area("Tulis Komplain Anda")
@@ -153,6 +163,7 @@ def komplain():
         komplain_ws = connect_gsheet().worksheet("Komplain")
         komplain_ws.append_row([st.session_state.username, isi, link, str(datetime.now())])
         st.success("Komplain berhasil dikirim.")
+
 
 def profil_saya():
     st.title("👤 Profil Saya")
@@ -174,6 +185,7 @@ def admin_dashboard():
     st.title("📊 Dashboard Admin")
     st.markdown("<div class='info-card'>Selamat datang di Admin Panel Kost123.</div>", unsafe_allow_html=True)
 
+
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
     kamar_ws = connect_gsheet().worksheet("Kamar")
@@ -189,6 +201,7 @@ def kelola_kamar():
         link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
         kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
         st.success("Kamar berhasil ditambahkan.")
+
 
 def verifikasi_booking():
     st.title("✅ Verifikasi Booking")
@@ -209,6 +222,7 @@ def verifikasi_booking():
             booking_ws.delete_rows(idx+2)
             st.success(f"{b['nama']} disetujui dengan password default 12345678.")
 
+
 def manajemen_penyewa():
     st.title("👥 Manajemen Penyewa")
     user_ws = connect_gsheet().worksheet("User")
@@ -216,6 +230,7 @@ def manajemen_penyewa():
     for u in users:
         if u['role'] == 'penyewa':
             st.markdown(f"<div class='info-card'>{u['username']} - {u.get('kamar','-')}</div>", unsafe_allow_html=True)
+
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
