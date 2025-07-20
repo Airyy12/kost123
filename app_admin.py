@@ -63,32 +63,30 @@ def admin_dashboard():
     st.markdown("---")
 
     # Grafik Komplain per Bulan
-    # Grafik Komplain per Bulan
-st.markdown("### 📢 Ringkasan Komplain per Bulan")
+    st.markdown("### 📢 Ringkasan Komplain per Bulan")
 
-if komplain_data:
-    df_komplain = pd.DataFrame(komplain_data)
-    df_komplain['waktu_parsed'] = pd.to_datetime(df_komplain['waktu'], errors='coerce')
-    df_komplain = df_komplain.dropna(subset=['waktu_parsed'])
-    df_komplain['bulan'] = df_komplain['waktu_parsed'].dt.strftime('%B %Y')
+    if komplain_data:
+        df_komplain = pd.DataFrame(komplain_data)
+        df_komplain['bulan'] = pd.to_datetime(df_komplain['waktu']).dt.strftime('%B %Y')
 
-    komplain_per_bulan = df_komplain['bulan'].value_counts().sort_index()
-    fig = px.bar(
-        x=komplain_per_bulan.index,
-        y=komplain_per_bulan.values,
-        labels={'x': 'Bulan', 'y': 'Jumlah Komplain'},
-        title="Jumlah Komplain per Bulan",
-        color_discrete_sequence=["indianred"]
-    )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("Belum ada data komplain.")
+        komplain_per_bulan = df_komplain['bulan'].value_counts().sort_index()
+        fig = px.bar(
+            x=komplain_per_bulan.index,
+            y=komplain_per_bulan.values,
+            labels={'x': 'Bulan', 'y': 'Jumlah Komplain'},
+            title="Jumlah Komplain per Bulan",
+            color_discrete_sequence=["indianred"]
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Belum ada data komplain.")
+
+    st.markdown("---")
 
     # Komplain terbaru
     st.markdown("### 📌 Komplain Terbaru")
     for k in komplain_data[-5:]:
         st.write(f"- {k['username']} : {k['isi_komplain']} ({k['waktu']})")
-
 
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
