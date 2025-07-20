@@ -5,7 +5,7 @@ from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime
 import re
 
-# ---------- Fungsi Login & Registrasi ----------
+# ---------- Fungsi Login & Registrasi Admin ----------
 
 def cek_admin():
     user_ws = connect_gsheet().worksheet("User")
@@ -40,6 +40,7 @@ def login(username, password):
     return None
 
 # ---------- Fitur Admin ----------
+
 def kelola_kamar():
     st.subheader("➕ Tambah Kamar Baru")
 
@@ -91,6 +92,7 @@ def kelola_kamar():
                 kamar_ws.delete_rows(idx + 2)
                 st.success(f"Kamar {k['Nama']} dihapus.")
                 st.rerun()
+
 def verifikasi_booking():
     st.subheader("📄 Verifikasi Booking")
     sheet = connect_gsheet()
@@ -105,18 +107,37 @@ def verifikasi_booking():
         st.write(f"Kontak: {b['no_hp_email']}")
 
         if st.button(f"Setujui {b['nama']}", key=f"setuju{idx}"):
-            password = "12345678"  # Default password
+            password = "12345678"
             hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
             user_ws.append_row([b['nama'], hashed, "penyewa"])
 
-            # Update status kamar
             for i, k in enumerate(kamar_data):
                 if k['Nama'] == b['kamar_dipilih']:
-                    kamar_ws.update_cell(i+2, 2, "Terisi")  # Kolom Status
+                    kamar_ws.update_cell(i+2, 2, "Terisi")
 
             booking_ws.delete_rows(idx+2)
             st.success(f"{b['nama']} disetujui. Password default: {password}")
             st.rerun()
+
+def manajemen_penyewa():
+    st.subheader("👥 Manajemen Penyewa")
+
+    user_ws = connect_gsheet().worksheet("User")
+    users = user_ws.get_all_records()
+
+    penyewa_list = [u for u in users if u['role'] == 'penyewa']
+
+    if not penyewa_list:
+        st.info("Belum ada penyewa yang terdaftar.")
+        return
+
+    for idx, p in enumerate(penyewa_list):
+        with st.expander(f"{p['username']}"):
+            st.write(f"**Username:** {p['username']}")
+            if st.button(f"Hapus Penyewa {p['username']}", key=f"hapus_penyewa_{idx}"):
+                user_ws.delete_rows(idx + 2)
+                st.success(f"Penyewa {p['username']} dihapus.")
+                st.rerun()
 
 # ---------- Fitur Penyewa ----------
 
@@ -175,11 +196,14 @@ else:
         st.sidebar.success(f"Login sebagai {st.session_state.role.capitalize()}")
 
         if st.session_state.role == "admin":
-            menu = st.sidebar.selectbox("Menu Admin", ["Kelola Kamar", "Verifikasi Booking"])
+            menu = st.sidebar.selectbox("Menu Admin", ["Kelola Kamar", "Verifikasi Booking", "Manajemen Penyewa"])
             if menu == "Kelola Kamar":
                 kelola_kamar()
             elif menu == "Verifikasi Booking":
                 verifikasi_booking()
+            elif menu == "Manajemen Penyewa":
+                manajemen_penyewa()
+
         elif st.session_state.role == "penyewa":
             fitur_penyewa(st.session_state.username)
 
