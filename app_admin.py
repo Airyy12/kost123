@@ -43,12 +43,26 @@ body {
     font-weight: bold;
     box-shadow: inset 0 0 5px #00000055;
 }
-.info-card {
+.info-box {
     background: rgba(139,0,0,0.5);
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+}
+.info-box i {
+    font-size: 24px;
+    margin-right: 15px;
+}
+.profile-pic {
+    border-radius: 50%;
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border: 3px solid #fff;
+    margin-bottom: 10px;
 }
 .stButton>button {
     background-color: #3d3d3d;
@@ -61,14 +75,6 @@ body {
 }
 .stButton>button:hover {
     background-color: #505050;
-}
-.status-box {
-    background: rgba(139,0,0,0.5);
-    padding: 15px;
-    border-radius: 10px;
-    margin-top: 10px;
-    font-size: 16px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -134,13 +140,30 @@ def penyewa_dashboard():
 
     st.title(f"Selamat Datang, {user_data.get('nama_lengkap', user_data['username'])}")
 
-    st.markdown(f"""
-    <div class="status-box">
-        <b>No Kamar:</b> {user_data.get('kamar','Belum Terdaftar')}<br>
-        <b>Status Pembayaran:</b> {user_data.get('Status Pembayaran','Belum Ada Data')}
-    </div>
-    """, unsafe_allow_html=True)
+    if user_data.get('foto'):
+        st.image(user_data['foto'], width=100, caption="Foto Profil", output_format="JPEG", use_column_width=False, clamp=True)
 
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(f"""
+        <div class="info-box">
+            <i>🛏️</i>
+            <div>
+                <b>Nomor Kamar:</b><br>{user_data.get('kamar','Belum Terdaftar')}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="info-box">
+            <i>💰</i>
+            <div>
+                <b>Status Pembayaran:</b><br>{user_data.get('Status Pembayaran','Belum Ada Data')}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 def pembayaran():
     st.title("💸 Pembayaran Kost")
@@ -230,7 +253,6 @@ def manajemen_penyewa():
     for u in users:
         if u['role'] == 'penyewa':
             st.markdown(f"<div class='info-card'>{u['username']} - {u.get('kamar','-')}</div>", unsafe_allow_html=True)
-
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
