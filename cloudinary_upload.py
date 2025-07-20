@@ -2,13 +2,12 @@ import cloudinary
 import cloudinary.uploader
 import streamlit as st
 
-# Konfigurasi Cloudinary
 cloudinary.config(
-    cloud_name = st.secrets["cloudinary"]["dhjw0n163"],
-    api_key = st.secrets["cloudinary"]["325875229438527"],
-    api_secret = st.secrets["cloudinary"]["L0lX5djSMjalU09ZQp7czlLmxU8"]
+    cloud_name=st.secrets["cloudinary"]["cloud_name"],
+    api_key=st.secrets["cloudinary"]["api_key"],
+    api_secret=st.secrets["cloudinary"]["api_secret"]
 )
 
-def upload_file_to_cloudinary(file, filename):
-    result = cloudinary.uploader.upload(file, public_id=filename, overwrite=True)
+def upload_image(file, folder="kost123"):
+    result = cloudinary.uploader.upload(file, folder=folder)
     return result['secure_url']
