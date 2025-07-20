@@ -85,6 +85,7 @@ if 'login_status' not in st.session_state:
     st.session_state.role = None
     st.session_state.username = ""
     st.session_state.menu = None
+    st.session_state.submenu = None
 
 # ---------- Sidebar ----------
 def sidebar_menu():
@@ -114,6 +115,7 @@ def sidebar_menu():
                 style += " menu-selected"
             if st.button(label, key=key):
                 st.session_state.menu = key
+                st.session_state.submenu = None
 
 # ---------- Login ----------
 def login_page():
@@ -132,7 +134,7 @@ def login_page():
                 return
         st.error("Username atau Password salah.")
 
-# ---------- Penyewa Dashboard ----------
+# ---------- Penyewa ----------
 def penyewa_dashboard():
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
@@ -172,54 +174,46 @@ def profil_saya():
     idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
     user_data = users[idx]
 
-    st.title("👤 Profil Saya")
-    nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
-    kontak = st.text_input("Nomor HP / Email", value=user_data.get('kontak',''))
-    foto = st.file_uploader("Foto Profil", type=["jpg","jpeg","png"])
+    st.header("👤 Profil Saya")
 
-    can_edit = True
-    if user_data['role'] == 'penyewa':
-        last_edit = user_data.get('last_edit', '')
-        if last_edit:
-            last_time = datetime.strptime(last_edit, "%Y-%m-%d %H:%M:%S")
-            if datetime.now() - last_time < timedelta(days=7):
-                can_edit = False
+    st.write(f"**Username:** {user_data['username']}")
+    st.write(f"**Nama Lengkap:** {user_data.get('nama_lengkap','')}")
+    st.write(f"**Nomor HP/Email:** {user_data.get('kontak','')}")
+    st.write(f"**Kamar:** {user_data.get('kamar','-')}")
 
-    if can_edit:
-        if st.button("Update Profil"):
-            link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto','')
-            user_ws.update(f"C{idx+2}", nama)
-            user_ws.update(f"D{idx+2}", kontak)
-            user_ws.update(f"E{idx+2}", link)
-            user_ws.update(f"I{idx+2}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            st.success("Profil berhasil diperbarui.")
-    else:
-        st.info("Update profil hanya bisa dilakukan seminggu sekali.")
+    if st.button("Edit Profil"):
+        st.session_state.submenu = "edit_profil"
 
-    if st.button("Ganti Sandi"):
-        st.session_state.menu = "Ganti Sandi"
+    if st.session_state.submenu == "edit_profil":
+        st.subheader("Edit Profil")
+        last_edit_str = user_data.get('last_edit', '')
+        can_edit = True
 
-# ---------- Ganti Sandi ----------
-def ganti_sandi():
-    user_ws = connect_gsheet().worksheet("User")
-    users = user_ws.get_all_records()
-    idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
+        if st.session_state.role != 'admin':
+            if last_edit_str:
+                last_edit = datetime.strptime(last_edit_str, "%Y-%m-%d %H:%M:%S")
+                if datetime.now() - last_edit < timedelta(days=7):
+                    can_edit = False
 
-    st.title("🔑 Ganti Sandi")
-    old = st.text_input("Password Lama", type="password")
-    new = st.text_input("Password Baru", type="password")
-    konfirm = st.text_input("Konfirmasi Password Baru", type="password")
+        if can_edit:
+            nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap',''))
+            kontak = st.text_input("Nomor HP / Email", value=user_data.get('kontak',''))
+            foto = st.file_uploader("Foto Profil", type=["jpg","jpeg","png"])
+            new_password = st.text_input("Ganti Password (Opsional)", type="password")
 
-    if st.button("Update Sandi"):
-        if bcrypt.checkpw(old.encode(), users[idx]['password_hash'].encode()):
-            if new == konfirm:
-                hashed = bcrypt.hashpw(new.encode(), bcrypt.gensalt()).decode()
-                user_ws.update(f"B{idx+2}", hashed)
-                st.success("Password berhasil diubah.")
-            else:
-                st.error("Konfirmasi password tidak cocok.")
+            if st.button("Simpan Perubahan"):
+                link = upload_to_cloudinary(foto, f"Profil_{st.session_state.username}") if foto else user_data.get('foto','')
+                user_ws.update(f"C{idx+2}", nama)
+                user_ws.update(f"D{idx+2}", kontak)
+                user_ws.update(f"E{idx+2}", link)
+                user_ws.update(f"I{idx+2}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                if new_password:
+                    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                    user_ws.update(f"B{idx+2}", hashed)
+                st.success("Profil berhasil diperbarui.")
+                st.session_state.submenu = None
         else:
-            st.error("Password lama salah.")
+            st.warning("Edit profil hanya bisa dilakukan 1x dalam seminggu.")
 
 # ---------- Routing ----------
 if not st.session_state.login_status:
@@ -233,14 +227,12 @@ else:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
     elif st.session_state.role == "admin":
-        if menu == "Dashboard Admin": pass  # admin_dashboard()
-        elif menu == "Kelola Kamar": pass  # kelola_kamar()
-        elif menu == "Verifikasi Booking": pass  # verifikasi_booking()
-        elif menu == "Manajemen Penyewa": pass  # manajemen_penyewa()
+        if menu == "Dashboard Admin": pass # implementasi admin_dashboard()
+        elif menu == "Kelola Kamar": pass # implementasi kelola_kamar()
+        elif menu == "Verifikasi Booking": pass # implementasi verifikasi_booking()
+        elif menu == "Manajemen Penyewa": pass # implementasi manajemen_penyewa()
     else:
         if menu == "Dashboard": penyewa_dashboard()
-        elif menu == "Pembayaran": pass  # pembayaran()
-        elif menu == "Komplain": pass  # komplain()
+        elif menu == "Pembayaran": pass # implementasi pembayaran()
+        elif menu == "Komplain": pass # implementasi komplain()
         elif menu == "Profil Saya": profil_saya()
-        elif menu == "Ganti Sandi": ganti_sandi()
-
