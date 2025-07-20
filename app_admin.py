@@ -6,40 +6,70 @@ from cloudinary_upload import upload_to_cloudinary
 
 st.set_page_config(page_title="Kost123 Dashboard", layout="wide")
 
-# ---------- Sidebar Profesional ----------
-with st.sidebar:
-    st.markdown("""
-    <style>
-    .sidebar-title {
-        font-size:24px;
-        font-weight:bold;
-        color:#FFFFFF;
-        margin-bottom:10px;
-    }
-    .menu-option {
-        font-size:18px;
-        padding:8px;
-        border-radius:8px;
-        transition: all 0.3s ease;
-    }
-    .menu-option:hover {
-        background-color:#4A4A4A;
-        color:#FFFFFF;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# ---------- Sidebar Profesional Modern ----------
+st.markdown("""
+<style>
+[data-testid="stSidebar"] > div:first-child {
+    background: linear-gradient(145deg, #1f1f1f, #292929);
+    padding: 20px;
+    border-radius: 12px;
+}
+.sidebar-title {
+    font-size:24px;
+    font-weight:bold;
+    color:#FFFFFF;
+    margin-bottom:20px;
+}
+.menu-item {
+    color: #E0E0E0;
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+    font-size: 17px;
+}
+.menu-item:hover {
+    background-color: #3A3A3A;
+    cursor: pointer;
+}
+.menu-selected {
+    background-color: #4C4C4C;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
 
+# ---------- Sidebar ----------
+with st.sidebar:
     st.markdown('<div class="sidebar-title">🏠 Kost123 Panel</div>', unsafe_allow_html=True)
 
     if "role" not in st.session_state:
         st.session_state.role = None
 
+    menu = None
+
     if st.session_state.role == "admin":
-        menu = st.radio("", ["Dashboard Admin", "Kelola Kamar", "Verifikasi Booking", "Manajemen Penyewa", "Logout"], format_func=lambda x: "📊 "+x if "Dashboard" in x else ("🛠️ "+x if "Kelola" in x else ("✅ "+x if "Verifikasi" in x else ("👥 "+x if "Manajemen" in x else "🚪 Logout"))), key="admin_menu")
+        menu_options = {
+            "Dashboard Admin": "📊 Dashboard Admin",
+            "Kelola Kamar": "🛠️ Kelola Kamar",
+            "Verifikasi Booking": "✅ Verifikasi Booking",
+            "Manajemen Penyewa": "👥 Manajemen Penyewa",
+            "Logout": "🚪 Logout"
+        }
     elif st.session_state.role == "penyewa":
-        menu = st.radio("", ["Dashboard", "Pembayaran", "Komplain", "Profil Saya", "Logout"], format_func=lambda x: "📊 "+x if x=="Dashboard" else ("💸 "+x if x=="Pembayaran" else ("📢 "+x if x=="Komplain" else ("👤 "+x if x=="Profil Saya" else "🚪 Logout"))), key="penyewa_menu")
-    else:
-        menu = None
+        menu_options = {
+            "Dashboard": "📊 Dashboard",
+            "Pembayaran": "💸 Pembayaran",
+            "Komplain": "📢 Komplain",
+            "Profil Saya": "👤 Profil Saya",
+            "Logout": "🚪 Logout"
+        }
+
+    if st.session_state.role:
+        for key, label in menu_options.items():
+            if st.button(label, key=key):
+                st.session_state.menu = key
+                st.experimental_rerun()
 
 # ---------- Main Content ----------
 if "login_status" not in st.session_state:
@@ -57,11 +87,13 @@ if not st.session_state.login_status:
                 st.session_state.login_status = True
                 st.session_state.username = username
                 st.session_state.role = u['role']
+                st.session_state.menu = list(menu_options.keys())[0]
                 st.experimental_rerun()
         else:
             st.error("Username atau Password salah.")
 else:
     if st.session_state.role == "penyewa":
+        menu = st.session_state.get("menu", "Dashboard")
         if menu == "Dashboard":
             st.title("📊 Dashboard Penyewa")
             user_ws = connect_gsheet().worksheet("User")
@@ -112,6 +144,7 @@ else:
             st.experimental_rerun()
 
     elif st.session_state.role == "admin":
+        menu = st.session_state.get("menu", "Dashboard Admin")
         if menu == "Dashboard Admin":
             st.title("📊 Dashboard Admin")
             st.write("Selamat datang di Admin Panel Kost123.")
