@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sheets import connect_gsheet
+from sheet import connect_gsheet, load_sheet_data
 from cloudinary_upload import upload_to_cloudinary
 from datetime import datetime, timedelta
 import bcrypt
