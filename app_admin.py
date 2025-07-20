@@ -45,7 +45,7 @@ def login_page():
             st.session_state.role = role
             st.session_state.username = user
             st.session_state.menu = "Dashboard"
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Username atau Password salah.")
 
@@ -166,7 +166,7 @@ else:
             admin_manajemen_penyewa()
         elif menu == "Logout":
             st.session_state.clear()
-            st.experimental_rerun()
+            st.rerun()
     elif st.session_state.role == "penyewa":
         menu = sidebar_penyewa()
         if menu == "Dashboard":
@@ -179,4 +179,4 @@ else:
             penyewa_profil()
         elif menu == "Logout":
             st.session_state.clear()
-            st.experimental_rerun()
+            st.rerun()
