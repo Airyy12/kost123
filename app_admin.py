@@ -22,7 +22,6 @@ def run_admin(menu):
         st.rerun()
 import streamlit as st
 import pandas as pd
-from utils import load_sheet_data  # pastikan kamu punya fungsi ini
 from datetime import datetime
 
 def admin_dashboard():
