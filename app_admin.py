@@ -133,6 +133,8 @@ def verifikasi_booking():
             st.success(f"{b['nama']} disetujui dengan password default 12345678.")
 
 def profil_saya():
+    if 'submenu' not in st.session_state:
+        st.session_state.submenu = None
     user_ws = connect_gsheet().worksheet("User")
     users = user_ws.get_all_records()
     idx = next(i for i,u in enumerate(users) if u['username']==st.session_state.username)
