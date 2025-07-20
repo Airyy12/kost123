@@ -20,104 +20,66 @@ def run_admin(menu):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
-
-import plotly.express as px
-from collections import Counter
+import streamlit as st
 import pandas as pd
+from utils import load_sheet_data  # pastikan kamu punya fungsi ini
+from datetime import datetime
+
 def admin_dashboard():
     st.title("📊 Dashboard Admin")
 
-    # Load data dari Google Sheets
-    conn = connect_gsheet()
-    kamar_ws = conn.worksheet("Kamar")
-    user_ws = conn.worksheet("User")
-    pembayaran_ws = conn.worksheet("Pembayaran")
-    komplain_ws = conn.worksheet("Komplain")
-    booking_ws = conn.worksheet("Booking")
+    # Load semua data
+    df_komplain = load_sheet_data('komplain')
+    df_booking = load_sheet_data('booking')
+    df_pembayaran = load_sheet_data('pembayaran')
 
-    kamar_data = kamar_ws.get_all_records()
-    user_data = user_ws.get_all_records()
-    pembayaran_data = pembayaran_ws.get_all_records()
-    komplain_data = komplain_ws.get_all_records()
-    booking_data = booking_ws.get_all_records()
+    # Pastikan tidak ada kolom yang salah format
+    for df in [df_komplain, df_booking, df_pembayaran]:
+        df.columns = df.columns.str.strip()
 
-    # Statistik
-    total_kamar = len(kamar_data)
-    kamar_terisi = sum(1 for k in kamar_data if k['Status'].lower() == 'terisi')
-    kamar_kosong = total_kamar - kamar_terisi
-    penyewa = sum(1 for u in user_data if u['role'] == 'penyewa')
-    total_pemasukan = sum(int(p.get('nominal', 0)) for p in pembayaran_data if str(p.get('nominal', '')).isdigit())
-
-    # 📌 Statistik Umum
-    st.markdown("### 📌 Statistik Umum")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Kamar", total_kamar)
-    col2.metric("Kamar Terisi", kamar_terisi)
-    col3.metric("Kamar Kosong", kamar_kosong)
-    col4.metric("Penyewa Aktif", penyewa)
-
-    st.markdown("---")
-
-    # 💰 Pemasukan Bulan Ini
-    st.markdown("### 💰 Total Pemasukan Bulan Ini")
-    st.success(f"Rp {total_pemasukan:,}")
-
-    st.markdown("---")
-
-    # 📢 Komplain Terbaru
-    st.markdown("### 📢 Komplain Terbaru")
-    if komplain_data:
-        komplain_terbaru = komplain_data[-5:][::-1]
-        for k in komplain_terbaru:
-            st.markdown(
-                f"""
-                <div style="background-color:#f9f9f9; padding:15px; border-left:5px solid #e74c3c; border-radius:8px; margin-bottom:10px;">
-                    <strong>🧑 {k['username']}</strong> &nbsp; | &nbsp; <span style="color:gray;">🕒 {k['waktu']}</span><br>
-                    <div style="margin-top:8px;">{k['isi_komplain']}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+    st.markdown("### 🛠️ Komplain Terbaru")
+    if df_komplain.empty:
+        st.info("Belum ada komplain.")
     else:
-        st.info("Belum ada data komplain.")
-
-    st.markdown("---")
-
-    # 🛎️ Booking Terbaru
-    st.markdown("### 🛎️ Booking Terbaru")
-    if booking_data:
-        booking_terbaru = booking_data[-5:][::-1]
-        for b in booking_terbaru:
-            st.markdown(
-                f"""
-                <div style="background-color:#eef6ff; padding:15px; border-left:5px solid #3498db; border-radius:8px; margin-bottom:10px;">
-                    <strong>🧑 {b['username']}</strong> memesan kamar <strong>{b['nama_kamar']}</strong><br>
-                    <span style="color:gray;">🕒 {b['waktu_booking']}</span> &nbsp; | &nbsp; Status: <strong>{b['status']}</strong>
+        komplain_terbaru = df_komplain.sort_values("waktu", ascending=False).head(5)
+        for _, row in komplain_terbaru.iterrows():
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color:#fef3c7; padding:10px; border-radius:10px; margin-bottom:10px;">
+                    <strong>📅 {row['waktu']}</strong><br>
+                    🧑 <strong>{row['nama']}</strong><br>
+                    📝 {row['komplain']}
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
-    else:
+                """, unsafe_allow_html=True)
+
+    st.markdown("### 📝 Booking Terbaru")
+    if df_booking.empty:
         st.info("Belum ada data booking.")
-
-    st.markdown("---")
-
-    # 💳 Pembayaran Terbaru
-    st.markdown("### 💳 Pembayaran Terbaru")
-    if pembayaran_data:
-        pembayaran_terbaru = pembayaran_data[-5:][::-1]
-        for p in pembayaran_terbaru:
-            st.markdown(
-                f"""
-                <div style="background-color:#f3f9f4; padding:15px; border-left:5px solid #2ecc71; border-radius:8px; margin-bottom:10px;">
-                    <strong>🧑 {p['username']}</strong> membayar sebesar <strong>Rp {p['nominal']}</strong><br>
-                    <span style="color:gray;">🕒 {p['waktu']}</span> &nbsp; | &nbsp; Keterangan: {p.get('keterangan', '-')}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
     else:
+        booking_terbaru = df_booking.sort_values("waktu", ascending=False).head(5)
+        for _, b in booking_terbaru.iterrows():
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color:#dbeafe; padding:10px; border-radius:10px; margin-bottom:10px;">
+                    <strong>📅 {b['waktu']}</strong><br>
+                    🧑 <strong>{b['username']}</strong> memesan kamar <strong>{b['kamar_dipilih']}</strong>
+                </div>
+                """, unsafe_allow_html=True)
+
+    st.markdown("### 💵 Pembayaran Terbaru")
+    if df_pembayaran.empty:
         st.info("Belum ada data pembayaran.")
+    else:
+        pembayaran_terbaru = df_pembayaran.sort_values("waktu", ascending=False).head(5)
+        for _, p in pembayaran_terbaru.iterrows():
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px;">
+                    <strong>📅 {p['waktu']}</strong><br>
+                    🧑 <strong>{p['username']}</strong> membayar untuk kamar <strong>{p['nama_kamar']}</strong><br>
+                    💸 Total: Rp {p['jumlah_bayar']}
+                </div>
+                """, unsafe_allow_html=True)
 
 def kelola_kamar():
     st.title("🛠️ Kelola Kamar")
