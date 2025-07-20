@@ -85,7 +85,6 @@ def kelola_kamar():
         st.success("Kamar berhasil ditambahkan.")
         st.rerun()
 
-    # ---------- Daftar Kamar ----------
     st.markdown("---")
     st.subheader("🏠 Kelola Data Kamar")
 
@@ -173,16 +172,22 @@ def fitur_penyewa(username):
                 st.warning("Mohon isi tahun dengan angka.")
             else:
                 bulan_tahun = f"{bulan} {tahun}"
-                link = upload_to_cloudinary(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
+                link = ""
+                if bukti:
+                    link = upload_to_cloudinary(bukti, f"Bayar_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
                 bayar_ws = connect_gsheet().worksheet("Pembayaran")
                 bayar_ws.append_row([username, link, bulan_tahun, str(datetime.now())])
                 st.success("Bukti pembayaran berhasil dikirim.")
 
     if menu == "Komplain":
         isi = st.text_area("Tulis Komplain Anda")
+        foto_komplain = st.file_uploader("Upload Foto (Opsional)", type=["jpg", "jpeg", "png"])
         if st.button("Kirim Komplain"):
+            link_foto = ""
+            if foto_komplain:
+                link_foto = upload_to_cloudinary(foto_komplain, f"Komplain_{username}_{datetime.now().strftime('%Y%m%d%H%M')}")
             komplain_ws = connect_gsheet().worksheet("Komplain")
-            komplain_ws.append_row([username, isi, str(datetime.now())])
+            komplain_ws.append_row([username, isi, link_foto, str(datetime.now())])
             st.success("Komplain berhasil dikirim.")
 
     if menu == "Cek Status Pembayaran":
