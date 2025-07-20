@@ -69,7 +69,7 @@ with st.sidebar:
         for key, label in menu_options.items():
             if st.button(label, key=key):
                 st.session_state.menu = key
-                st.experimental_rerun()
+                st.rerun()
 
 # ---------- Main Content ----------
 if "login_status" not in st.session_state:
@@ -88,7 +88,7 @@ if not st.session_state.login_status:
                 st.session_state.username = username
                 st.session_state.role = u['role']
                 st.session_state.menu = list(menu_options.keys())[0]
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.error("Username atau Password salah.")
 else:
@@ -141,7 +141,7 @@ else:
 
         elif menu == "Logout":
             st.session_state.clear()
-            st.experimental_rerun()
+            st.rerun()
 
     elif st.session_state.role == "admin":
         menu = st.session_state.get("menu", "Dashboard Admin")
@@ -151,16 +151,54 @@ else:
 
         elif menu == "Kelola Kamar":
             st.title("🛠️ Kelola Kamar")
-            st.write("(Fitur kelola kamar di sini - placeholder)")
+            kamar_ws = connect_gsheet().worksheet("Kamar")
+            data = kamar_ws.get_all_records()
+
+            st.subheader("Daftar Kamar")
+            for idx, k in enumerate(data):
+                st.write(f"{k['Nama']} - {k['Status']} - Rp{k['Harga']}")
+
+            st.markdown("---")
+            st.subheader("Tambah Kamar Baru")
+            nama = st.text_input("Nama Kamar")
+            harga = st.number_input("Harga", min_value=0)
+            deskripsi = st.text_area("Deskripsi")
+            foto = st.file_uploader("Upload Foto", type=["jpg","jpeg","png"])
+
+            if st.button("Tambah Kamar"):
+                link = upload_to_cloudinary(foto, f"Kamar_{nama}") if foto else ""
+                kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
+                st.success("Kamar berhasil ditambahkan.")
 
         elif menu == "Verifikasi Booking":
             st.title("✅ Verifikasi Booking")
-            st.write("(Fitur verifikasi booking di sini - placeholder)")
+            booking_ws = connect_gsheet().worksheet("Booking")
+            user_ws = connect_gsheet().worksheet("User")
+            kamar_ws = connect_gsheet().worksheet("Kamar")
+
+            bookings = booking_ws.get_all_records()
+            kamar_data = kamar_ws.get_all_records()
+
+            for idx, b in enumerate(bookings):
+                st.write(f"{b['nama']} mengajukan kamar {b['kamar_dipilih']}")
+                if st.button(f"Setujui {b['nama']}", key=f"setuju_{idx}"):
+                    password = "12345678"
+                    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+                    user_ws.append_row([b['nama'], hashed, "penyewa", b['kamar_dipilih'], '', '', '', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+                    for i, k in enumerate(kamar_data):
+                        if k['Nama'] == b['kamar_dipilih']:
+                            kamar_ws.update_cell(i+2, 2, "Terisi")
+                    booking_ws.delete_rows(idx+2)
+                    st.success(f"{b['nama']} disetujui dengan password default 12345678.")
 
         elif menu == "Manajemen Penyewa":
             st.title("👥 Manajemen Penyewa")
-            st.write("(Fitur manajemen penyewa di sini - placeholder)")
+            user_ws = connect_gsheet().worksheet("User")
+            users = user_ws.get_all_records()
+            for u in users:
+                if u['role'] == 'penyewa':
+                    st.write(f"{u['username']} - {u.get('kamar','-')}")
 
         elif menu == "Logout":
             st.session_state.clear()
-            st.experimental_rerun()
+            st.rerun()
