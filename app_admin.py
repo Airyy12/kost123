@@ -98,21 +98,21 @@ def penyewa_dashboard():
 
     st.markdown("""
     <style>
-    .card {
-        background: linear-gradient(145deg, #f5f5f5, #e0e0e0);
+    .card-red {
+        background: rgba(139,0,0,0.85); /* Merah gelap transparan */
         padding: 20px;
         border-radius: 12px;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 4px 4px 12px rgba(0,0,0,0.3);
         text-align: center;
+        color: #FFFFFF; /* Tulisan putih */
     }
-    .card h3 {
+    .card-red h3 {
         margin: 0;
-        font-size: 22px;
+        font-size: 24px;
     }
-    .card p {
+    .card-red p {
         margin: 5px 0 0;
         font-size: 16px;
-        color: #555;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -121,7 +121,7 @@ def penyewa_dashboard():
 
     with col1:
         st.markdown(f"""
-        <div class="card">
+        <div class="card-red">
             <h3>🏠 {kamar}</h3>
             <p>Kamar Anda</p>
         </div>
@@ -130,7 +130,7 @@ def penyewa_dashboard():
     with col2:
         color_status = "🟢" if "Lunas" in status_bayar else "🔴"
         st.markdown(f"""
-        <div class="card">
+        <div class="card-red">
             <h3>{color_status} {status_bayar}</h3>
             <p>Status Pembayaran</p>
         </div>
@@ -138,16 +138,15 @@ def penyewa_dashboard():
 
     with col3:
         st.markdown(f"""
-        <div class="card">
+        <div class="card-red">
             <h3>📞 {kontak}</h3>
-            <p>Kontak</p>
+            <p>Kontak Anda</p>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("Informasi Tambahan")
-    st.info("Silakan gunakan menu sidebar untuk melakukan pembayaran, komplain, atau update profil.")
-
+    st.info("Gunakan menu di sidebar untuk pembayaran, komplain, atau edit profil.")
 
 def pembayaran():
     st.title("💸 Pembayaran Kost")
