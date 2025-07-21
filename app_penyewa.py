@@ -163,20 +163,32 @@ def show_dashboard(gsheet):
 
         # ==================== RIWAYAT PEMBAYARAN ====================
         st.markdown("""
-        <div style="margin: 40px 0 15px;">
+        <div style="margin: 30px 0 15px; border-bottom: 1px solid #444; padding-bottom: 10px;">
             <h3><i class="fas fa-history"></i> Riwayat Pembayaran Terakhir</h3>
         </div>
         """, unsafe_allow_html=True)
 
         try:
             if user_payments:
-                # Process payment data
+                # Fungsi untuk menentukan status
+                def determine_status(payment):
+                    if payment.get('status'):
+                        return payment['status']
+                    
+                    payment_date = datetime.strptime(payment['waktu'].split()[0], "%Y-%m-%d")
+                    days_passed = (datetime.now() - payment_date).days
+                    
+                    if days_passed > 3:
+                        return "Belum Dibayar"
+                    elif payment.get('bukti'):
+                        return "Menunggu Verifikasi"
+                    else:
+                        return "Belum Dibayar"
+
+                # Proses data pembayaran
                 processed_payments = []
                 for payment in sorted(user_payments, key=lambda x: x.get('waktu', ''), reverse=True)[:5]:
-                    status = payment.get('status', '')
-                    if not status:
-                        payment_date = datetime.strptime(payment['waktu'].split()[0], "%Y-%m-%d")
-                        status = "Belum Dibayar" if (datetime.now() - payment_date).days > 3 else "Menunggu Verifikasi"
+                    status = determine_status(payment)
                     
                     processed_payments.append({
                         'periode': f"{payment.get('bulan', '')} {payment.get('tahun', '')}",
@@ -187,7 +199,7 @@ def show_dashboard(gsheet):
                         'bukti': payment.get('bukti', '')
                     })
 
-                # Create styled table
+                # Buat tabel HTML
                 table_html = """
                 <style>
                     .payment-table {
@@ -201,25 +213,44 @@ def show_dashboard(gsheet):
                         color: white;
                         padding: 12px 15px;
                         text-align: left;
+                        position: sticky;
+                        top: 0;
                     }
                     .payment-table td {
                         padding: 12px 15px;
                         border-bottom: 1px solid #34495e;
                     }
                     .payment-table tr:hover {
-                        background-color: rgba(52, 152, 219, 0.05);
+                        background-color: rgba(52, 152, 219, 0.1);
                     }
-                    .status-lunas { color: #2ecc71; font-weight: 500; }
-                    .status-menunggu { color: #f39c12; font-weight: 500; }
-                    .status-belum { color: #e74c3c; font-weight: 500; }
+                    .status-verified {
+                        color: #27ae60;
+                        font-weight: 500;
+                    }
+                    .status-pending {
+                        color: #f39c12;
+                        font-weight: 500;
+                    }
+                    .status-unpaid {
+                        color: #e74c3c;
+                        font-weight: 500;
+                    }
                     .payment-link {
                         color: #3498db;
                         text-decoration: none;
+                        font-weight: 500;
                     }
                     .payment-link:hover {
                         text-decoration: underline;
                     }
+                    .payment-table-container {
+                        max-height: 400px;
+                        overflow-y: auto;
+                        border: 1px solid #34495e;
+                        border-radius: 8px;
+                    }
                 </style>
+                <div class="payment-table-container">
                 <table class="payment-table">
                     <thead>
                         <tr>
@@ -235,34 +266,57 @@ def show_dashboard(gsheet):
                 """
 
                 for payment in processed_payments:
-                    status_class = ""
-                    if 'Lunas' in payment['status']:
-                        status_class = "status-lunas"
+                    # Tentukan class status
+                    if 'Lunas' in payment['status'] or 'Diverifikasi' in payment['status']:
+                        status_class = "status-verified"
                     elif 'Menunggu' in payment['status']:
-                        status_class = "status-menunggu"
-                    elif 'Belum' in payment['status']:
-                        status_class = "status-belum"
-
-                    bukti_link = f"""<a href="{payment['bukti']}" target="_blank" class="payment-link">Lihat</a>""" if payment['bukti'] else "-"
+                        status_class = "status-pending"
+                    else:
+                        status_class = "status-unpaid"
                     
+                    # Format link bukti
+                    bukti_link = f"""
+                    <a href="{payment['bukti']}" target="_blank" class="payment-link">
+                        <i class="fas fa-file-invoice"></i> Lihat
+                    </a>
+                    """ if payment['bukti'] else "-"
+
                     table_html += f"""
                     <tr>
                         <td>{payment['periode']}</td>
                         <td>{payment['nominal']}</td>
                         <td>{payment['metode']}</td>
-                        <td class="{status_class}">{payment['status']}</td>
+                        <td class="{status_class}">
+                            <i class="fas fa-{
+                                'check-circle' if 'Lunas' in payment['status'] 
+                                else 'clock' if 'Menunggu' in payment['status'] 
+                                else 'times-circle'
+                            }"></i> {payment['status']}
+                        </td>
                         <td>{payment['tanggal']}</td>
                         <td>{bukti_link}</td>
                     </tr>
                     """
 
-                table_html += "</tbody></table>"
+                table_html += """
+                    </tbody>
+                </table>
+                </div>
+                """
                 st.markdown(table_html, unsafe_allow_html=True)
+                
+                # Tambahkan catatan
+                st.markdown("""
+                <div style="margin-top: 10px; font-size: 14px; color: #95a5a6;">
+                    <i class="fas fa-info-circle"></i> Status pembayaran akan diperbarui oleh admin dalam 1x24 jam
+                </div>
+                """, unsafe_allow_html=True)
+                
             else:
                 st.markdown("""
                 <div style="background-color: rgba(52, 152, 219, 0.1); 
                     padding: 25px; border-radius: 8px; text-align: center;
-                    margin-top: 20px;">
+                    margin: 20px 0;">
                     <i class="fas fa-info-circle" style="font-size: 28px; color: #3498db;"></i>
                     <p style="margin-top: 15px; font-size: 16px; color: #7f8c8d;">
                         Belum ada riwayat pembayaran
@@ -271,11 +325,12 @@ def show_dashboard(gsheet):
                 """, unsafe_allow_html=True)
                 
         except Exception as payment_error:
-            st.error(f"Gagal memuat riwayat pembayaran: {str(payment_error)}")
+            st.error(f"🔴 Gagal memuat riwayat pembayaran: {str(payment_error)}")
+            st.error("Silakan refresh halaman atau hubungi admin")
 
     except Exception as e:
-        st.error(f"Terjadi kesalahan sistem: {str(e)}")
-        st.error("Silakan coba lagi atau hubungi admin")
+        st.error(f"🔴 Terjadi kesalahan sistem: {str(e)}")
+        st.error("Silakan coba lagi nanti")
         
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
