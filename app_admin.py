@@ -523,13 +523,16 @@ def manajemen_pembayaran():
                         if st.button("✅ Verifikasi", key=f"verif_{idx}", use_container_width=True):
                             # Update status di sheet Pembayaran
                             all_payments = pembayaran_ws.get_all_values()
+                            # Kolom: 0=username, 2=bulan, 3=tahun
                             row_num = next(
                                 (i+1 for i, row in enumerate(all_payments)
-                                 if row[0] == bayar['username'] and row[3] == bayar['bulan'] and row[4] == bayar['tahun']),
+                                 if row[0] == bayar['username'] and row[2] == bayar['bulan'] and row[3] == str(bayar['tahun'])),
                                 None
                             )
                             if row_num:
                                 pembayaran_ws.update_cell(row_num, 7, "Lunas")
+                            else:
+                                st.warning("Baris pembayaran tidak ditemukan, gagal update status.")
                             
                             # Update status di sheet User
                             user_ws = connect_gsheet().worksheet("User")
@@ -537,6 +540,8 @@ def manajemen_pembayaran():
                             user_row = next((i+1 for i, row in enumerate(users) if row[0] == bayar['username']), None)
                             if user_row:
                                 user_ws.update_cell(user_row, 10, "Lunas")
+                            else:
+                                st.warning("Baris user tidak ditemukan, gagal update status user.")
                             
                             st.success("Pembayaran berhasil diverifikasi!")
                             st.rerun()
@@ -546,11 +551,13 @@ def manajemen_pembayaran():
                             all_payments = pembayaran_ws.get_all_values()
                             row_num = next(
                                 (i+1 for i, row in enumerate(all_payments)
-                                 if row[0] == bayar['username'] and row[3] == bayar['bulan'] and row[4] == bayar['tahun']),
+                                 if row[0] == bayar['username'] and row[2] == bayar['bulan'] and row[3] == str(bayar['tahun'])),
                                 None
                             )
                             if row_num:
                                 pembayaran_ws.update_cell(row_num, 7, "Ditolak")
+                            else:
+                                st.warning("Baris pembayaran tidak ditemukan, gagal update status.")
                             st.warning("Pembayaran ditolak!")
                             st.rerun()
     
@@ -570,15 +577,13 @@ def manajemen_komplain():
             
         # Filter komplain
         filter_status = st.selectbox("Filter Status", 
-                                   ["Semua", "Belum Ditanggapi", "Sudah Ditanggapi"],
+                                   ["Semua", "Belum Ditanggapi", "Sudah Ditanggapi", "Selesai", "Ditolak"],
                                    key="filter_status_komplain")
         
         # Apply filter
         filtered_komplain = komplain_data
-        if filter_status == "Belum Ditanggapi":
-            filtered_komplain = [k for k in komplain_data if k.get('status', 'Belum Ditanggapi') == 'Belum Ditanggapi']
-        elif filter_status == "Sudah Ditanggapi":
-            filtered_komplain = [k for k in komplain_data if k.get('status', 'Belum Ditanggapi') == 'Sudah Ditanggapi']
+        if filter_status != "Semua":
+            filtered_komplain = [k for k in komplain_data if k.get('status', 'Belum Ditanggapi') == filter_status]
         
         for idx, komplain in enumerate(filtered_komplain):
             with st.expander(f"{komplain['username']} - {komplain['waktu']}", expanded=False):
@@ -622,6 +627,34 @@ def manajemen_komplain():
                 if komplain.get('status') == 'Sudah Ditanggapi' and komplain.get('tanggapan'):
                     st.markdown("**Tanggapan Admin:**")
                     st.write(komplain['tanggapan'])
+
+                # Tombol status Selesai/Ditolak
+                if komplain.get('status') in ['Sudah Ditanggapi', 'Belum Ditanggapi']:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Tandai Selesai", key=f"selesai_{idx}"):
+                            all_komplain = komplain_ws.get_all_values()
+                            row_num = next(
+                                (i+1 for i, row in enumerate(all_komplain)
+                                 if row[0] == komplain['username'] and row[3] == komplain['waktu']),
+                                None
+                            )
+                            if row_num:
+                                komplain_ws.update_cell(row_num, 5, "Selesai")
+                            st.success("Komplain ditandai selesai.")
+                            st.rerun()
+                    with col2:
+                        if st.button("❌ Tolak Komplain", key=f"tolak_{idx}"):
+                            all_komplain = komplain_ws.get_all_values()
+                            row_num = next(
+                                (i+1 for i, row in enumerate(all_komplain)
+                                 if row[0] == komplain['username'] and row[3] == komplain['waktu']),
+                                None
+                            )
+                            if row_num:
+                                komplain_ws.update_cell(row_num, 5, "Ditolak")
+                            st.warning("Komplain ditolak.")
+                            st.rerun()
                 
                 # Tombol hapus
                 if st.button("🗑️ Hapus Komplain", key=f"hapus_{idx}"):
@@ -635,7 +668,6 @@ def manajemen_komplain():
                         komplain_ws.delete_rows(row_num)
                         st.warning("Komplain berhasil dihapus!")
                         st.rerun()
-    
     except Exception as e:
         st.error(f"Terjadi kesalahan: {str(e)}")
 
@@ -939,6 +971,5 @@ def profil_saya():
                         if st.form_submit_button("❌ Batal"):
                             st.session_state.edit_profile = False
                             st.rerun()
-    
     except Exception as e:
         st.error(f"Terjadi kesalahan saat memuat profil: {str(e)}")
