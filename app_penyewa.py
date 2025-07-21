@@ -100,6 +100,7 @@ def show_dashboard(gsheet):
             
     except Exception as e:
         st.error(f"Terjadi kesalahan saat memuat data: {e}")
+        
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
     
