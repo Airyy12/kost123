@@ -20,9 +20,7 @@ def run_penyewa(menu):
     elif menu == "Logout":
         logout()
 
-# Tambahkan import berikut di awal file
-from datetime import datetime
-import streamlit as st
+
 
 def show_dashboard(gsheet):
     # Tambahkan CSS dan Font Awesome
@@ -221,37 +219,22 @@ def show_dashboard(gsheet):
         """, unsafe_allow_html=True)
 
         if user_payments:
-            def get_payment_status(payment):
-                status = payment.get('status', '')
-                if status.lower() in ['lunas', 'diverifikasi']:
-                    return 'Lunas'
-                elif status.lower() in ['menunggu verifikasi', 'proses verifikasi']:
-                    return 'Menunggu Verifikasi'
-                elif status.lower() in ['ditolak', 'gagal']:
-                    return 'Ditolak'
-                return 'Belum Dibayar'
+            def format_status(status):
+                status = status.lower()
+                if status in ['lunas', 'diverifikasi']:
+                    return ('Lunas', 'check-circle', 'status-lunas')
+                elif status in ['menunggu verifikasi', 'proses verifikasi']:
+                    return ('Menunggu Verifikasi', 'hourglass-half', 'status-menunggu')
+                elif status in ['ditolak', 'gagal']:
+                    return ('Ditolak', 'times-circle', 'status-belum')
+                return ('Belum Dibayar', 'exclamation-circle', 'status-belum')
 
-            processed_payments = []
-            for payment in sorted(user_payments, 
-                               key=lambda x: x.get('waktu', '') or '1970-01-01', 
-                               reverse=True)[:5]:
-                try:
-                    status = get_payment_status(payment)
-                    bulan = payment.get('bulan', '')
-                    tahun = payment.get('tahun', '')
-                    
-                    processed_payments.append({
-                        'periode': f"{bulan} {tahun}" if bulan and tahun else '-',
-                        'nominal': f"Rp {int(payment.get('nominal', 0)):,}",
-                        'metode': payment.get('metode', 'Transfer Bank'),
-                        'status': status,
-                        'tanggal': payment.get('waktu', '').split()[0] if payment.get('waktu') else '-',
-                        'bukti': payment.get('bukti', '')
-                    })
-                except Exception:
-                    continue
+            latest_payments = sorted(
+                user_payments,
+                key=lambda x: x.get('waktu', '1970-01-01'),
+                reverse=True
+            )[:5]
 
-            # Buat tabel
             table_html = """
             <div class="table-responsive">
             <table class="payment-table">
@@ -268,37 +251,43 @@ def show_dashboard(gsheet):
                 <tbody>
             """
 
-            for payment in processed_payments:
-                status_class = {
-                    'Lunas': 'status-lunas',
-                    'Menunggu Verifikasi': 'status-menunggu',
-                    'Ditolak': 'status-belum',
-                    'Belum Dibayar': 'status-belum'
-                }.get(payment['status'], '')
-                
-                status_icon = {
-                    'Lunas': 'check-circle',
-                    'Menunggu Verifikasi': 'hourglass-half',
-                    'Ditolak': 'times-circle',
-                    'Belum Dibayar': 'exclamation-circle'
-                }.get(payment['status'], 'question-circle')
-                
-                bukti_link = f"""
-                <a href="{payment['bukti']}" target="_blank" class="payment-link">
+            for pay in latest_payments:
+                bulan = pay.get('bulan', '-')
+                tahun = pay.get('tahun', '-')
+                periode = f"{bulan} {tahun}" if bulan != '-' and tahun != '-' else '-'
+
+                try:
+                    nominal = int(pay.get('nominal', 0))
+                    nominal_str = f"Rp {nominal:,}"
+                except:
+                    nominal_str = "-"
+
+                metode = pay.get('metode', 'Transfer Bank')
+
+                status_raw = pay.get('status', '')
+                status_label, icon, css_class = format_status(status_raw)
+
+                tanggal = "-"
+                if pay.get('waktu'):
+                    tanggal = pay['waktu'].split()[0]
+
+                bukti_url = pay.get('bukti', '')
+                bukti_html = f"""
+                <a href="{bukti_url}" target="_blank" class="payment-link">
                     <i class="fas fa-file-invoice"></i> Lihat
                 </a>
-                """ if payment.get('bukti') else '-'
+                """ if bukti_url else "-"
 
                 table_html += f"""
                 <tr>
-                    <td>{payment['periode']}</td>
-                    <td>{payment['nominal']}</td>
-                    <td>{payment['metode']}</td>
-                    <td class="{status_class}">
-                        <i class="fas fa-{status_icon}"></i> {payment['status']}
+                    <td>{periode}</td>
+                    <td>{nominal_str}</td>
+                    <td>{metode}</td>
+                    <td class="{css_class}">
+                        <i class="fas fa-{icon}"></i> {status_label}
                     </td>
-                    <td>{payment['tanggal']}</td>
-                    <td>{bukti_link}</td>
+                    <td>{tanggal}</td>
+                    <td>{bukti_html}</td>
                 </tr>
                 """
 
@@ -308,7 +297,7 @@ def show_dashboard(gsheet):
             </div>
             """
             st.markdown(table_html, unsafe_allow_html=True)
-            
+
         else:
             st.markdown("""
             <div style="background-color: rgba(52, 152, 219, 0.1); 
@@ -323,72 +312,6 @@ def show_dashboard(gsheet):
 
     except Exception as e:
         st.error(f"🔴 Terjadi kesalahan sistem: {str(e)}")
-        
-def show_payment(gsheet):
-    st.header("💸 Pembayaran")
-    
-    try:
-        # Get user data
-        user_ws = gsheet.worksheet("User")
-        user_data = user_ws.get_all_records()
-        current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
-        
-        if not current_user:
-            st.error("Data pengguna tidak ditemukan")
-            return
-            
-        # Get room data
-        room_ws = gsheet.worksheet("Kamar")
-        rooms = room_ws.get_all_records()
-        user_room = next((r for r in rooms if r['Nama'] == current_user['kamar']), None) if current_user.get('kamar') else None
-        
-        if not user_room:
-            st.error("Anda belum memiliki kamar yang dipesan")
-            return
-        
-        # Current month and year
-        current_month = datetime.now().strftime("%B")
-        current_year = datetime.now().strftime("%Y")
-        
-        st.markdown(f"### Tagihan Bulan Ini ({current_month} {current_year})")
-        st.markdown(f"**Jumlah:** Rp {int(user_room['Harga']):,}")
-        
-        # Payment form
-        with st.form("payment_form"):
-            st.markdown("### Bayar Sekarang")
-            
-            # Auto-fill bulan dan tahun
-            bulan = st.selectbox("Bulan", [current_month], disabled=True)
-            tahun = st.selectbox("Tahun", [current_year], disabled=True)
-            
-            amount = st.number_input("Jumlah Pembayaran", 
-                                   min_value=0, 
-                                   max_value=int(user_room['Harga']),
-                                   value=int(user_room['Harga']))
-            payment_proof = st.file_uploader("Upload Bukti Pembayaran (foto/PDF)", type=["jpg", "jpeg", "png", "pdf"])
-            
-            if st.form_submit_button("Kirim Pembayaran"):
-                if amount > 0 and payment_proof:
-                    payment_ws = gsheet.worksheet("Pembayaran")
-                    new_payment = {
-                        'username': current_user['username'],
-                        'bukti': payment_proof.name,
-                        'bulan': current_month,
-                        'tahun': current_year,
-                        'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        'nominal': amount,
-                        'status': 'Menunggu Verifikasi'
-                    }
-                    
-                    # Save to Google Sheets
-                    payment_ws.append_row(list(new_payment.values()))
-                    st.success("Pembayaran berhasil dikirim! Menunggu verifikasi admin.")
-                    st.rerun()
-                else:
-                    st.error("Harap isi semua field dan upload bukti pembayaran")
-    
-    except Exception as e:
-        st.error(f"Terjadi kesalahan: {str(e)}")
 
 def show_complaint(gsheet):
     st.header("📢 Komplain")
