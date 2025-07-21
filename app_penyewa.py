@@ -21,12 +21,11 @@ def run_penyewa(menu):
         logout()
 
 
-
 import streamlit as st
 from datetime import datetime
 
 def show_dashboard(gsheet):
-    # Tambahkan CSS dan Font Awesome
+    # ---------- Tambah CSS ----------
     st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
@@ -38,11 +37,6 @@ def show_dashboard(gsheet):
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             height: 100%;
         }
-        .info-card h3 {
-            margin-top: 0;
-            color: #ecf0f1;
-            font-size: 18px;
-        }
         .payment-table {
             width: 100%;
             border-collapse: collapse;
@@ -53,7 +47,6 @@ def show_dashboard(gsheet):
         }
         .payment-table th {
             background-color: #34495e;
-            color: white;
             padding: 12px 15px;
             text-align: left;
         }
@@ -64,18 +57,9 @@ def show_dashboard(gsheet):
         .payment-table tr:hover {
             background-color: rgba(52, 152, 219, 0.2);
         }
-        .status-lunas {
-            color: #2ecc71;
-            font-weight: 500;
-        }
-        .status-menunggu {
-            color: #f39c12;
-            font-weight: 500;
-        }
-        .status-belum {
-            color: #e74c3c;
-            font-weight: 500;
-        }
+        .status-lunas { color: #2ecc71; font-weight: 500; }
+        .status-menunggu { color: #f39c12; font-weight: 500; }
+        .status-belum { color: #e74c3c; font-weight: 500; }
         .payment-link {
             color: #3498db;
             text-decoration: none;
@@ -90,62 +74,51 @@ def show_dashboard(gsheet):
     st.header("📊 Dashboard Penyewa")
 
     try:
-        # ========== LOAD DATA ==========
-        try:
-            user_ws = gsheet.worksheet("User")
-            user_data = user_ws.get_all_records()
-            current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
-            
-            if not current_user:
-                st.error("🔴 Data pengguna tidak ditemukan")
-                st.stop()
-                
-            room_ws = gsheet.worksheet("Kamar")
-            rooms = room_ws.get_all_records()
-            user_room = next((r for r in rooms if r['Nama'] == current_user.get('kamar', '')), None)
-            
-            payment_ws = gsheet.worksheet("Pembayaran")
-            payments = payment_ws.get_all_records()
-            user_payments = [p for p in payments if str(p.get('username', '')).strip() == str(current_user['username']).strip()]
-            
-        except Exception as load_error:
-            st.error(f"🔴 Gagal memuat data: {str(load_error)}")
+        # ---------- Load Data ----------
+        user_ws = gsheet.worksheet("User")
+        user_data = user_ws.get_all_records()
+        current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
+
+        if not current_user:
+            st.error("🔴 Data pengguna tidak ditemukan.")
             st.stop()
 
-        # ========== INFO CARDS ==========
+        room_ws = gsheet.worksheet("Kamar")
+        rooms = room_ws.get_all_records()
+        user_room = next((r for r in rooms if r['Nama'] == current_user.get('kamar', '')), None)
+
+        payment_ws = gsheet.worksheet("Pembayaran")
+        payments = payment_ws.get_all_records()
+        user_payments = [p for p in payments if str(p.get('username', '')).strip() == str(current_user['username']).strip()]
+
+        # ---------- Info Cards ----------
         col1, col2, col3 = st.columns(3)
-        
-        # Card 1: Kamar Saya
+
+        # Kamar Saya
         with col1:
             room_name = current_user.get('kamar', 'Belum Ada')
             room_status = user_room.get('Status', 'Tidak Diketahui') if user_room else 'Tidak Diketahui'
             room_price = int(user_room.get('Harga', 0)) if user_room else 0
             room_floor = user_room.get('lantai', '-') if user_room else '-'
-            
             status_color = {
                 'Terisi': '#4CAF50',
                 'Tersedia': '#2196F3',
                 'Perbaikan': '#FF9800'
             }.get(room_status, '#9E9E9E')
-            
+
             st.markdown(f"""
             <div class="info-card">
                 <h3><i class="fas fa-door-open"></i> Kamar Saya</h3>
                 <div style="display: flex; align-items: center; margin: 15px 0 20px;">
-                    <span style="font-size: 28px; font-weight: bold; margin-right: 15px;">
-                        {room_name}
-                    </span>
-                    <span style="padding: 5px 12px; background-color: {status_color}; 
-                          color: white; border-radius: 15px; font-size: 14px;">
-                        {room_status}
-                    </span>
+                    <span style="font-size: 28px; font-weight: bold; margin-right: 15px;">{room_name}</span>
+                    <span style="padding: 5px 12px; background-color: {status_color}; border-radius: 15px;">{room_status}</span>
                 </div>
                 <div style="border-top: 1px solid #444; padding-top: 15px;">
-                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
+                    <div style="display: flex; justify-content: space-between;">
                         <span><i class="fas fa-tag"></i> Harga:</span>
-                        <span style="font-weight: 500;">Rp {room_price:,}/bulan</span>
+                        <span>Rp {room_price:,}/bulan</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
+                    <div style="display: flex; justify-content: space-between;">
                         <span><i class="fas fa-layer-group"></i> Lantai:</span>
                         <span>{room_floor}</span>
                     </div>
@@ -153,98 +126,78 @@ def show_dashboard(gsheet):
             </div>
             """, unsafe_allow_html=True)
 
-        # Card 2: Status Pembayaran
+        # Status Pembayaran
         with col2:
             payment_status = current_user.get('status_pembayaran', 'Belum Dibayar')
-            status_config = {
-                'Lunas': {'icon': 'check-circle', 'color': '#4CAF50'},
-                'Belum Dibayar': {'icon': 'exclamation-circle', 'color': '#F44336'},
-                'Menunggu Verifikasi': {'icon': 'hourglass-half', 'color': '#FFC107'},
-                'Ditolak': {'icon': 'times-circle', 'color': '#E91E63'}
-            }
-            config = status_config.get(payment_status, {'icon': 'question-circle', 'color': '#9E9E9E'})
-            
+            config = {
+                'Lunas': ('check-circle', '#4CAF50'),
+                'Belum Dibayar': ('exclamation-circle', '#F44336'),
+                'Menunggu Verifikasi': ('hourglass-half', '#FFC107'),
+                'Ditolak': ('times-circle', '#E91E63')
+            }.get(payment_status, ('question-circle', '#9E9E9E'))
+
             st.markdown(f"""
             <div class="info-card">
                 <h3><i class="fas fa-credit-card"></i> Pembayaran</h3>
                 <div style="text-align: center; margin: 20px 0;">
-                    <i class="fas fa-{config['icon']}" 
-                       style="font-size: 42px; color: {config['color']}; margin-bottom: 10px;"></i>
-                    <h4 style="color: {config['color']}; margin: 5px 0;">{payment_status}</h4>
+                    <i class="fas fa-{config[0]}" style="font-size: 42px; color: {config[1]};"></i>
+                    <h4 style="color: {config[1]};">{payment_status}</h4>
                 </div>
                 <div style="border-top: 1px solid #444; padding-top: 15px;">
-                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
-                        <span>Tagihan:</span>
-                        <span>Rp {room_price:,}</span>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Tagihan:</span><span>Rp {room_price:,}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
-                        <span>Tenggat:</span>
-                        <span>10 {datetime.now().strftime('%B %Y')}</span>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Tenggat:</span><span>10 {datetime.now().strftime('%B %Y')}</span>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # Card 3: Kontak Admin
+        # Kontak Admin
         with col3:
             st.markdown("""
             <div class="info-card">
                 <h3><i class="fas fa-headset"></i> Kontak Admin</h3>
                 <div style="padding: 15px 0;">
-                    <div style="display: flex; align-items: center; margin: 15px 0;">
-                        <i class="fas fa-phone-alt" style="width: 30px; color: #4CAF50;"></i>
-                        <span>0812-3456-7890</span>
-                    </div>
-                    <div style="display: flex; align-items: center; margin: 15px 0;">
-                        <i class="fas fa-envelope" style="width: 30px; color: #2196F3;"></i>
-                        <span>admin@kost123.com</span>
-                    </div>
-                    <div style="display: flex; align-items: center; margin: 15px 0;">
-                        <i class="fas fa-map-marker-alt" style="width: 30px; color: #F44336;"></i>
-                        <span>Jl. Kost No.123, Jakarta</span>
-                    </div>
+                    <div><i class="fas fa-phone-alt" style="width: 30px;"></i> 0812-3456-7890</div>
+                    <div><i class="fas fa-envelope" style="width: 30px;"></i> admin@kost123.com</div>
+                    <div><i class="fas fa-map-marker-alt" style="width: 30px;"></i> Jl. Kost No.123, Jakarta</div>
                 </div>
-                <div style="border-top: 1px solid #444; padding-top: 15px; text-align: center;">
+                <div style="text-align: center; border-top: 1px solid #444; padding-top: 15px;">
                     <a href="https://wa.me/6281234567890" target="_blank" 
                        style="background-color: #25D366; color: white; padding: 8px 16px; 
-                              border-radius: 4px; text-decoration: none; display: inline-block;">
+                              border-radius: 4px; text-decoration: none;">
                         <i class="fab fa-whatsapp"></i> Hubungi via WhatsApp
                     </a>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # ========== RIWAYAT PEMBAYARAN ==========
+        # ---------- Riwayat Pembayaran ----------
         st.markdown("""
-        <div style="margin: 30px 0 15px; border-bottom: 1px solid #444; padding-bottom: 10px;">
+        <div style="margin-top: 30px; border-bottom: 1px solid #444; padding-bottom: 10px;">
             <h3><i class="fas fa-history"></i> Riwayat Pembayaran Terakhir</h3>
         </div>
         """, unsafe_allow_html=True)
 
         if user_payments:
             def format_status(status, bukti):
-                status = str(status).lower().strip()
-                bukti = str(bukti).strip()
-
-                if status in ['lunas', 'diverifikasi']:
+                s = str(status).lower().strip()
+                if s in ['lunas', 'diverifikasi']:
                     return ('Lunas', 'check-circle', 'status-lunas')
-                elif status in ['menunggu verifikasi', 'proses verifikasi']:
+                elif s in ['menunggu verifikasi', 'proses verifikasi']:
                     return ('Menunggu Verifikasi', 'hourglass-half', 'status-menunggu')
-                elif status in ['ditolak', 'gagal']:
+                elif s in ['ditolak', 'gagal']:
                     return ('Ditolak', 'times-circle', 'status-belum')
-                elif bukti:  # Jika ada bukti tapi status masih kosong
+                elif bukti:
                     return ('Menunggu Verifikasi', 'hourglass-half', 'status-menunggu')
                 else:
                     return ('Belum Dibayar', 'exclamation-circle', 'status-belum')
 
-            latest_payments = sorted(
-                user_payments,
-                key=lambda x: x.get('waktu', '1970-01-01'),
-                reverse=True
-            )[:5]
+            latest = sorted(user_payments, key=lambda x: x.get('waktu', '1970-01-01'), reverse=True)[:5]
 
-            table_html = """
-            <div class="table-responsive">
+            html = """
             <table class="payment-table">
                 <thead>
                     <tr>
@@ -259,66 +212,41 @@ def show_dashboard(gsheet):
                 <tbody>
             """
 
-            for pay in latest_payments:
-                bulan = pay.get('bulan', '-')
-                tahun = pay.get('tahun', '-')
-                periode = f"{bulan} {tahun}" if bulan != '-' and tahun != '-' else '-'
+            for p in latest:
+                periode = f"{p.get('bulan', '-') } {p.get('tahun', '-')}"
+                nominal = f"Rp {int(p.get('nominal', 0)):,}" if p.get('nominal') else "-"
+                metode = p.get('metode', '-')
+                status, icon, css = format_status(p.get('status'), p.get('bukti'))
+                tanggal = p.get('waktu', '-').split()[0]
+                bukti = p.get('bukti', '')
+                bukti_html = f"""<a href="{bukti}" target="_blank" class="payment-link"><i class="fas fa-file-invoice"></i> Lihat</a>""" if bukti else "-"
 
-                try:
-                    nominal = int(pay.get('nominal', 0))
-                    nominal_str = f"Rp {nominal:,}"
-                except:
-                    nominal_str = "-"
-
-                metode = pay.get('metode', 'Transfer Bank')
-                bukti_url = pay.get('bukti', '')
-                status_raw = pay.get('status', '')
-                status_label, icon, css_class = format_status(status_raw, bukti_url)
-
-                tanggal = "-"
-                if pay.get('waktu'):
-                    tanggal = pay['waktu'].split()[0]
-
-                bukti_html = f"""
-                <a href="{bukti_url}" target="_blank" class="payment-link">
-                    <i class="fas fa-file-invoice"></i> Lihat
-                </a>
-                """ if bukti_url else "-"
-
-                table_html += f"""
+                html += f"""
                 <tr>
                     <td>{periode}</td>
-                    <td>{nominal_str}</td>
+                    <td>{nominal}</td>
                     <td>{metode}</td>
-                    <td class="{css_class}">
-                        <i class="fas fa-{icon}"></i> {status_label}
-                    </td>
+                    <td class="{css}"><i class="fas fa-{icon}"></i> {status}</td>
                     <td>{tanggal}</td>
                     <td>{bukti_html}</td>
                 </tr>
                 """
 
-            table_html += """
-                </tbody>
-            </table>
-            </div>
-            """
-            st.markdown(table_html, unsafe_allow_html=True)
+            html += "</tbody></table>"
+            st.markdown(html, unsafe_allow_html=True)
 
         else:
             st.markdown("""
-            <div style="background-color: rgba(52, 152, 219, 0.1); 
-                padding: 25px; border-radius: 8px; text-align: center;
-                margin: 20px 0;">
+            <div style="background-color: rgba(52, 152, 219, 0.1); padding: 25px; border-radius: 8px; text-align: center;">
                 <i class="fas fa-info-circle" style="font-size: 28px; color: #3498db;"></i>
                 <p style="margin-top: 15px; font-size: 16px; color: #7f8c8d;">
-                    Belum ada riwayat pembayaran
+                    Belum ada riwayat pembayaran.
                 </p>
             </div>
             """, unsafe_allow_html=True)
 
     except Exception as e:
-        st.error(f"🔴 Terjadi kesalahan sistem: {str(e)}")
+        st.error(f"🔴 Terjadi kesalahan: {str(e)}")
 
 def show_complaint(gsheet):
     st.header("📢 Komplain")
