@@ -33,41 +33,61 @@ def show_dashboard(gsheet):
             st.error("Data pengguna tidak ditemukan")
             return
             
-        # Get room data - handle case where kamar_id might not exist
+        # Debug: Tampilkan data user untuk pemeriksaan
+        st.write("Debug - Data User:", current_user)
+        
+        # Get room data
         room_ws = gsheet.worksheet("Kamar")
         rooms = room_ws.get_all_records()
         
         user_room = None
         if 'kamar_id' in current_user and current_user['kamar_id']:
             try:
-                user_room = next((r for r in rooms if str(r['id']) == str(current_user['kamar_id'])), None)
+                user_room = next((r for r in rooms if str(r.get('id', '')) == str(current_user['kamar_id'])), None)
             except (KeyError, StopIteration):
                 user_room = None
         
-        # Get payment data
+        # Debug: Tampilkan data kamar untuk pemeriksaan
+        st.write("Debug - Data Kamar:", user_room)
+        
+        # Get payment data dengan pengecekan kolom yang lebih aman
         payment_ws = gsheet.worksheet("Pembayaran")
         payments = payment_ws.get_all_records()
-        user_payments = [p for p in payments if str(p['user_id']) == str(current_user['id'])] if current_user else []
+        
+        user_payments = []
+        if current_user and 'id' in current_user:
+            user_payments = [
+                p for p in payments 
+                if str(p.get('user_id', '')) == str(current_user['id']) or 
+                   str(p.get('user_id', '')) == str(current_user['username'])
+            ]
+        
+        # Debug: Tampilkan data pembayaran untuk pemeriksaan
+        st.write("Debug - Data Pembayaran:", user_payments)
         
         # Display info cards
         col1, col2, col3 = st.columns(3)
         with col1:
+            room_name = user_room.get('nama', '-') if user_room else '-'
+            room_floor = user_room.get('lantai', '-') if user_room else '-'
+            room_price = int(user_room.get('harga', 0)) if user_room else 0
+            
             st.markdown(f"""
             <div class="info-card">
                 <h3>Kamar Saya</h3>
-                <p style="font-size:24px; margin:10px 0;">{user_room['nama'] if user_room else '-'}</p>
-                <p>Lantai: {user_room['lantai'] if user_room else '-'}</p>
-                <p>Harga: Rp {int(user_room['harga']):,}/bulan</p>
+                <p style="font-size:24px; margin:10px 0;">{room_name}</p>
+                <p>Lantai: {room_floor}</p>
+                <p>Harga: Rp {room_price:,}/bulan</p>
             </div>
             """, unsafe_allow_html=True)
         
         with col2:
-            payment_status = "Lunas" if user_payments and user_payments[-1]['status'] == 'lunas' else "Belum Lunas"
+            last_payment_status = user_payments[-1].get('status', 'Belum Lunas') if user_payments else 'Belum Lunas'
             st.markdown(f"""
             <div class="info-card">
                 <h3>Status Pembayaran</h3>
-                <p style="font-size:24px; margin:10px 0;">{payment_status}</p>
-                <p>Tagihan bulan ini: Rp {int(user_room['harga']):, if user_room else 0:,}</p>
+                <p style="font-size:24px; margin:10px 0;">{last_payment_status}</p>
+                <p>Tagihan bulan ini: Rp {room_price:,}</p>
             </div>
             """, unsafe_allow_html=True)
         
@@ -84,13 +104,24 @@ def show_dashboard(gsheet):
         # Recent payments
         st.subheader("Riwayat Pembayaran Terakhir")
         if user_payments:
-            df = pd.DataFrame(user_payments[-5:])
-            st.dataframe(df[['bulan', 'tanggal_bayar', 'jumlah', 'status']])
+            # Filter kolom yang ada saja
+            available_columns = []
+            if user_payments:
+                available_columns = [col for col in ['bulan', 'tanggal_bayar', 'jumlah', 'status'] 
+                                  if col in user_payments[0]]
+            
+            if available_columns:
+                df = pd.DataFrame(user_payments[-5:])[available_columns]
+                st.dataframe(df)
+            else:
+                st.warning("Format data pembayaran tidak dikenali")
         else:
             st.info("Belum ada riwayat pembayaran")
             
     except Exception as e:
         st.error(f"Terjadi kesalahan saat memuat data: {str(e)}")
+        st.error("Pastikan semua worksheet dan kolom yang diperlukan sudah ada di Google Sheets")
+        st.error("Worksheet yang diperlukan: User, Kamar, Pembayaran")
         
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
