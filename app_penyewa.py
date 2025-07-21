@@ -288,28 +288,65 @@ def fasilitas():
 def profil_saya():
     st.title("👤 Profil Saya")
     
+    # Custom CSS
+    st.markdown("""
+    <style>
+    .profile-section {
+        background: rgba(60,60,60,0.7);
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }
+    .profile-header {
+        color: #42A5F5;
+        border-bottom: 1px solid #444;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     try:
         user_data = load_user_data()
         
         # Tampilkan profil
+        st.markdown("### Informasi Profil")
         col1, col2 = st.columns([1, 3])
         with col1:
             if user_data.get('foto_profil'):
                 st.image(user_data['foto_profil'], width=150, caption="Foto Profil")
             else:
-                st.image("https://via.placeholder.com/150", width=150, caption="Belum Ada Foto")
+                st.image("https://via.placeholder.com/150?text=No+Photo", width=150, caption="Belum Ada Foto")
         
         with col2:
             st.markdown(f"""
-            <div style="background: rgba(60,60,60,0.7); padding: 15px; border-radius: 12px;">
-                <p><strong>Username:</strong> {user_data['username']}</p>
-                <p><strong>Nama Lengkap:</strong> {user_data.get('nama_lengkap', '-')}</p>
-                <p><strong>No. HP/Email:</strong> {user_data.get('no_hp', '-')}</p>
-                <p><strong>Kamar:</strong> {user_data.get('kamar', '-')}</p>
-                <p><strong>Status Pembayaran:</strong> {user_data.get('status_pembayaran', '-')}</p>
-                <p><strong>Terdaftar Sejak:</strong> {user_data.get('tanggal_daftar', '-')}</p>
+            <div class="profile-section">
+                <div class="profile-header">Data Pribadi</div>
+                <p><strong>👤 Username:</strong> {user_data['username']}</p>
+                <p><strong>🪪 Nama Lengkap:</strong> {user_data.get('nama_lengkap', '-')}</p>
+                <p><strong>📞 No. HP/Email:</strong> {user_data.get('no_hp', '-')}</p>
+                <p><strong>🏠 Kamar:</strong> {user_data.get('kamar', '-')}</p>
+                <p><strong>💰 Status Pembayaran:</strong> {user_data.get('status_pembayaran', '-')}</p>
+                <p><strong>📅 Bergabung Sejak:</strong> {user_data.get('tanggal_daftar', '-')}</p>
+                <p><strong>✏️ Terakhir Diubah:</strong> {user_data.get('last_edit', '-')}</p>
             </div>
             """, unsafe_allow_html=True)
+        
+        # Informasi Kamar
+        kamar_data = load_sheet_data('kamar')
+        if user_data.get('kamar'):
+            kamar = next((k for k in kamar_data if k['Nama'] == user_data['kamar']), None)
+            if kamar:
+                st.markdown("### Informasi Kamar")
+                st.markdown(f"""
+                <div class="profile-section">
+                    <div class="profile-header">Detail Kamar</div>
+                    <p><strong>🏷️ Nama Kamar:</strong> {kamar['Nama']}</p>
+                    <p><strong>💵 Harga:</strong> Rp {int(kamar.get('Harga', 0)):,}/bulan</p>
+                    <p><strong>📝 Deskripsi:</strong> {kamar.get('Deskripsi', '-')}</p>
+                    <p><strong>🔄 Status:</strong> {kamar.get('Status', '-')}</p>
+                </div>
+                """, unsafe_allow_html=True)
         
         # Form edit profil
         if st.button("✏️ Edit Profil", key="edit_profile_btn"):
@@ -319,10 +356,14 @@ def profil_saya():
             with st.form(key='edit_profile_form'):
                 st.markdown("### Edit Profil")
                 
-                nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap', ''))
-                no_hp = st.text_input("Nomor HP/Email", value=user_data.get('no_hp', ''))
+                col1, col2 = st.columns(2)
+                with col1:
+                    nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap', ''))
+                    no_hp = st.text_input("Nomor HP/Email", value=user_data.get('no_hp', ''))
+                with col2:
+                    foto = st.file_uploader("Ganti Foto Profil", type=["jpg","jpeg","png"])
+                
                 deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi', ''))
-                foto = st.file_uploader("Ganti Foto Profil", type=["jpg","jpeg","png"])
                 
                 st.markdown("### Ganti Password")
                 password_baru = st.text_input("Password Baru", type="password")
@@ -369,7 +410,6 @@ def profil_saya():
                 with col2:
                     if st.form_submit_button("❌ Batal"):
                         st.session_state.edit_profile = False
-                        st.rerun()
     
     except Exception as e:
         st.error(f"Terjadi kesalahan: {str(e)}")
