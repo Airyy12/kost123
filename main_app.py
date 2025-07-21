@@ -90,14 +90,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 # ---------- Session State Initialization ----------
 def init_session_state():
-    if 'login_status' not in st.session_state:
-        st.session_state.login_status = False
-        st.session_state.role = None
-        st.session_state.username = ""
-        st.session_state.menu = None
-        st.session_state.last_activity = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    """Initialize all required session state variables with default values"""
+    required_keys = {
+        'login_status': False,
+        'role': None,
+        'username': "",
+        'menu': None,
+        'last_activity': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    for key, default_value in required_keys.items():
+        if key not in st.session_state:
+            st.session_state[key] = default_value
 
 # ---------- Sidebar Menu ----------
 def sidebar_menu():
@@ -206,19 +213,17 @@ def check_inactivity():
 
 # ---------- Main App ----------
 def main():
-    init_session_state()
+    init_session_state()  # Initialize session state first
     check_inactivity()
     
     if not st.session_state.login_status:
         login_page()
     else:
-        # Set default menu if None
         if st.session_state.menu is None:
             st.session_state.menu = "Dashboard Admin" if st.session_state.role == "admin" else "Dashboard"
         
         sidebar_menu()
         
-        # Main content area
         try:
             if st.session_state.role == "admin":
                 run_admin(st.session_state.menu)
