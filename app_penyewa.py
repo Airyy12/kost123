@@ -42,35 +42,31 @@ def show_dashboard(gsheet):
         payment_ws = gsheet.worksheet("Pembayaran")
         payments = payment_ws.get_all_records()
         user_payments = [p for p in payments if p['username'] == current_user['username']]
-        
-        # Get booking data
-        booking_ws = gsheet.worksheet("Booking")
-        bookings = booking_ws.get_all_records()
-        user_booking = next((b for b in bookings if b['nama'] == current_user['nama_lengkap']), None)
 
         # Display info cards
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.markdown(f"""
+            room_info = f"""
             <div class="info-card">
                 <h3>Kamar Saya</h3>
                 <p style="font-size:24px; margin:10px 0;">{current_user.get('kamar', '-')}</p>
-                <p>Status: {user_room.get('Status', '-') if user_room else '-'}</p>
-                <p>Harga: Rp {int(user_room['Harga']):,}/bulan</p>
-            </div>
-            """ if user_room else """
-            <div class="info-card">
-                <h3>Kamar Saya</h3>
-                <p style="color:red;">Belum ada kamar yang dipesan</p>
-            </div>
-            """, unsafe_allow_html=True)
+            """
+            if user_room:
+                room_info += f"""
+                <p>Status: {user_room.get('Status', '-')}</p>
+                <p>Harga: Rp {int(user_room.get('Harga', 0)):,}/bulan</p>
+                """
+            else:
+                room_info += "<p style='color:red;'>Data kamar tidak ditemukan</p>"
+            room_info += "</div>"
+            st.markdown(room_info, unsafe_allow_html=True)
         
         with col2:
             st.markdown(f"""
             <div class="info-card">
                 <h3>Status Pembayaran</h3>
                 <p style="font-size:24px; margin:10px 0;">{current_user.get('status_pembayaran', 'Belum Lunas')}</p>
-                <p>Tagihan bulan ini: Rp {int(user_room['Harga']):, if user_room else 0:,}</p>
+                <p>Tagihan bulan ini: Rp {int(user_room.get('Harga', 0)) if user_room else 0:,}</p>
             </div>
             """, unsafe_allow_html=True)
         
@@ -84,30 +80,26 @@ def show_dashboard(gsheet):
             </div>
             """, unsafe_allow_html=True)
         
-        # Booking info
-        if user_booking:
-            st.subheader("📅 Informasi Booking")
-            st.write(f"Nama: {user_booking['nama']}")
-            st.write(f"Kamar: {user_booking['kamar_dipilih']}")
-            st.write(f"Waktu Booking: {user_booking['waktu_booking']}")
-        
         # Recent payments
         st.subheader("💸 Riwayat Pembayaran Terakhir")
         if user_payments:
-            df = pd.DataFrame(user_payments)
-            # Reformat bulan-tahun
-            df['Periode'] = df['bulan'] + ' ' + df['tahun'].astype(str)
-            st.dataframe(df[['Periode', 'waktu', 'nominal', 'status']].rename(columns={
-                'waktu': 'Waktu Pembayaran',
-                'nominal': 'Nominal',
-                'status': 'Status'
-            }))
+            # Process payment data
+            payment_data = []
+            for payment in user_payments[-5:]:  # Ambil 5 terakhir
+                payment_data.append({
+                    'Periode': f"{payment['bulan']} {payment['tahun']}",
+                    'Nominal': f"Rp {int(payment['nominal']):,}",
+                    'Status': payment.get('status', 'Menunggu Verifikasi'),
+                    'Waktu': payment['waktu'].split()[0]  # Ambil tanggal saja
+                })
+            
+            # Display as table
+            st.table(payment_data)
         else:
             st.info("Belum ada riwayat pembayaran")
             
     except Exception as e:
-        st.error(f"Terjadi kesalahan saat memuat data: {str(e)}")
-
+        st.error(f"Terjadi kesalahan saat memuat data: {e}")
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
     
