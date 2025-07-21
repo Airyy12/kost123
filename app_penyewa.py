@@ -6,61 +6,101 @@ from datetime import datetime, timedelta
 import bcrypt
 import requests
 
-# CSS kustom untuk tampilan yang lebih baik
+# ======================== CSS Kustom ========================
 st.markdown("""
 <style>
+    /* Font & Warna Utama */
+    :root {
+        --primary: #4a6bff;
+        --secondary: #6c757d;
+        --success: #28a745;
+        --warning: #ffc107;
+        --danger: #dc3545;
+        --light: #f8f9fa;
+        --dark: #343a40;
+    }
+    
+    /* Card Modern */
     .card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
         margin-bottom: 20px;
-        background-color: white;
+        transition: transform 0.2s;
     }
-    .card-title {
-        font-size: 1.2em;
-        font-weight: bold;
-        margin-bottom: 15px;
-        color: #2c3e50;
+    .card:hover {
+        transform: translateY(-2px);
     }
-    .stImage {
-        border-radius: 10px;
+    
+    /* Header */
+    .header {
+        background: linear-gradient(135deg, #4a6bff, #6a8eff);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        text-align: center;
     }
-    .success-box {
+    
+    /* Tombol */
+    .stButton>button {
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        transition: all 0.3s !important;
+    }
+    .stButton>button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Status */
+    .status-pending { color: var(--warning); font-weight: 600; }
+    .status-verified { color: var(--success); font-weight: 600; }
+    .status-ditolak { color: var(--danger); font-weight: 600; }
+    .status-terkirim { color: var(--primary); font-weight: 600; }
+    
+    /* Notifikasi */
+    .notif-success {
         background-color: #d4edda;
         color: #155724;
-        padding: 15px;
-        border-radius: 5px;
-        margin-bottom: 20px;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
     }
-    .warning-box {
+    .notif-warning {
         background-color: #fff3cd;
         color: #856404;
-        padding: 15px;
-        border-radius: 5px;
-        margin-bottom: 20px;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
     }
-    .info-box {
+    .notif-info {
         background-color: #d1ecf1;
         color: #0c5460;
-        padding: 15px;
-        border-radius: 5px;
-        margin-bottom: 20px;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
     }
-    .status-pending {
-        color: #ffc107;
-        font-weight: bold;
+    
+    /* Input */
+    .stTextInput>div>div>input, 
+    .stTextArea>div>div>textarea {
+        border-radius: 8px !important;
     }
-    .status-verified {
-        color: #28a745;
-        font-weight: bold;
+    
+    /* Tab */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
     }
-    .status-rejected {
-        color: #dc3545;
-        font-weight: bold;
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 16px;
+        border-radius: 8px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# ======================== Fungsi Utama ========================
 def run_penyewa(menu):
     if menu == "Beranda":
         show_dashboard()
@@ -68,7 +108,7 @@ def run_penyewa(menu):
         show_pembayaran()
     elif menu == "Komplain":
         show_komplain()
-    elif menu == "Profil Saya":
+    elif menu == "Profil":
         show_profil()
     elif menu == "Keluar":
         st.session_state.login_status = False
@@ -77,22 +117,22 @@ def run_penyewa(menu):
         st.session_state.menu = None
         st.rerun()
 
+# ======================== Dashboard ========================
 def show_dashboard():
-    # Header dengan animasi
+    # Header dengan gradient
     st.markdown(f"""
-    <div style='text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: #2c3e50;'>👋 Selamat datang, {st.session_state.get("nama", "Penyewa")}</h1>
-        <p style='color: #7f8c8d;'>Dashboard Informasi Kamar dan Pembayaran</p>
+    <div class="header">
+        <h1>👋 Selamat Datang, {st.session_state.get("nama", "Penyewa")}</h1>
+        <p>Dashboard Informasi Kamar & Pembayaran</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Muat semua data yang dibutuhkan
+    # Load data
     user_df = load_sheet_data("User")
     kamar_df = load_sheet_data("Kamar")
     pembayaran_df = load_sheet_data("Pembayaran")
     komplain_df = load_sheet_data("Komplain")
 
-    # Ambil data penyewa saat ini
     username = st.session_state.get("username", "")
     data_user = user_df[user_df['username'] == username].iloc[0]
     data_kamar = kamar_df[kamar_df['Nama'] == data_user['kamar']].iloc[0]
@@ -101,80 +141,84 @@ def show_dashboard():
     data_komplain = komplain_df[komplain_df['username'] == username]
     riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(5)
 
-    # Layout menggunakan columns dan cards
+    # Layout 2x2 Grid
     col1, col2 = st.columns(2)
 
     with col1:
-        with st.container():
-            st.markdown("<div class='card'><div class='card-title'>👤 Profil Penyewa</div>", unsafe_allow_html=True)
-            st.image(data_user['foto_profil'], width=200, use_column_width=False)
-            st.markdown(f"""
-            <div style='margin-top: 15px;'>
-                <p><b>Nama:</b> {data_user['nama_lengkap']}</p>
-                <p><b>No HP:</b> {data_user['no_hp']}</p>
-                <p><b>Kamar:</b> {data_user['kamar']}</p>
-                <p><b>Status Pembayaran:</b> <span class='status-{data_user['status_pembayaran'].lower()}'>{data_user['status_pembayaran']}</span></p>
-                <p><b>Terakhir Diubah:</b> {data_user['last_edit']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Card Profil Penyewa
+        st.markdown(f"""
+        <div class="card">
+            <h3>👤 Profil Saya</h3>
+            <img src="{data_user['foto_profil']}" width="100%" style="border-radius: 8px; margin-bottom: 10px;">
+            <p><b>Nama:</b> {data_user['nama_lengkap']}</p>
+            <p><b>No HP:</b> {data_user['no_hp']}</p>
+            <p><b>Kamar:</b> {data_user['kamar']}</p>
+            <p><b>Status:</b> <span class="status-{data_user['status_pembayaran'].lower().replace(' ', '-')}">{data_user['status_pembayaran']}</span></p>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col2:
-        with st.container():
-            st.markdown("<div class='card'><div class='card-title'>🛏️ Info Kamar</div>", unsafe_allow_html=True)
-            st.image(data_kamar['link_foto'], width=200, use_column_width=False)
-            st.markdown(f"""
-            <div style='margin-top: 15px;'>
-                <p><b>Nama Kamar:</b> {data_kamar['Nama']}</p>
-                <p><b>Status:</b> {data_kamar['Status']}</p>
-                <p><b>Harga:</b> Rp{data_kamar['Harga']:,}/bulan</p>
-                <p><b>Fasilitas:</b> {data_kamar['Deskripsi']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Card Info Kamar
+        st.markdown(f"""
+        <div class="card">
+            <h3>🛏️ Kamar Saya</h3>
+            <img src="{data_kamar['link_foto']}" width="100%" style="border-radius: 8px; margin-bottom: 10px;">
+            <p><b>Nama Kamar:</b> {data_kamar['Nama']}</p>
+            <p><b>Harga:</b> Rp{data_kamar['Harga']:,}/bulan</p>
+            <p><b>Status:</b> {data_kamar['Status']}</p>
+            <p><b>Deskripsi:</b> {data_kamar['Deskripsi']}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     col3, col4 = st.columns(2)
 
     with col3:
+        # Card Riwayat Komplain
         with st.container():
-            st.markdown("<div class='card'><div class='card-title'>💬 Riwayat Komplain Terakhir</div>", unsafe_allow_html=True)
+            st.markdown("""
+            <div class="card">
+                <h3>💬 Komplain Terakhir</h3>
+            """, unsafe_allow_html=True)
+            
             if riwayat_komplain.empty:
-                st.markdown("<div class='info-box'>Belum ada komplain</div>", unsafe_allow_html=True)
+                st.markdown('<div class="notif-info">Belum ada komplain</div>', unsafe_allow_html=True)
             else:
                 for _, row in riwayat_komplain.iterrows():
-                    status_class = "status-" + row['status'].lower().replace(" ", "-")
                     st.markdown(f"""
-                    <div style='margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;'>
-                        <p><b>{row['waktu']}</b> - <span class='{status_class}'>{row['status']}</span></p>
+                    <div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        <p><b>{row['waktu']}</b> - <span class="status-{row['status'].lower().replace(' ', '-')}">{row['status']}</span></p>
                         <p>{row['isi_komplain']}</p>
                     </div>
                     """, unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
     with col4:
+        # Card Pembayaran Terakhir
         with st.container():
-            st.markdown("<div class='card'><div class='card-title'>💳 Pembayaran Terakhir</div>", unsafe_allow_html=True)
+            st.markdown("""
+            <div class="card">
+                <h3>💳 Pembayaran Terakhir</h3>
+            """, unsafe_allow_html=True)
+            
             if pembayaran_terakhir:
                 p = pembayaran_terakhir[0]
-                status_class = "status-" + p['status'].lower().replace(" ", "-")
-                st.image(p["bukti"], width=200, use_column_width=False)
+                st.image(p["bukti"], use_column_width=True)
                 st.markdown(f"""
-                <div style='margin-top: 15px;'>
-                    <p><b>Periode:</b> {p['bulan']} {p['tahun']}</p>
-                    <p><b>Nominal:</b> Rp{p['nominal']:,}</p>
-                    <p><b>Status:</b> <span class='{status_class}'>{p['status']}</span></p>
-                    <p><b>Waktu Upload:</b> {p['waktu']}</p>
-                </div>
+                <p><b>Periode:</b> {p['bulan']} {p['tahun']}</p>
+                <p><b>Nominal:</b> Rp{p['nominal']:,}</p>
+                <p><b>Status:</b> <span class="status-{p['status'].lower().replace(' ', '-')}">{p['status']}</span></p>
+                <p><b>Waktu Upload:</b> {p['waktu']}</p>
                 """, unsafe_allow_html=True)
             else:
-                st.markdown("<div class='warning-box'>Belum ada pembayaran tercatat</div>", unsafe_allow_html=True)
+                st.markdown('<div class="notif-warning">Belum ada pembayaran</div>', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
+# ======================== Pembayaran ========================
 def show_pembayaran():
-    st.markdown(f"""
-    <div style='text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: #2c3e50;'>💸 Pembayaran Sewa</h1>
-        <p style='color: #7f8c8d;'>Upload bukti pembayaran dan lihat riwayat pembayaran</p>
+    st.markdown("""
+    <div class="header">
+        <h1>💸 Pembayaran Sewa</h1>
+        <p>Upload bukti pembayaran & lihat riwayat</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -184,54 +228,71 @@ def show_pembayaran():
     data = pd.DataFrame(ws.get_all_records())
     user_data = data[data['username'] == USERNAME]
 
+    # Form Upload Pembayaran
     with st.expander("📤 Upload Bukti Pembayaran Baru", expanded=True):
         with st.form("form_bayar"):
             cols = st.columns(2)
             with cols[0]:
                 bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", 
-                                             "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
+                                            "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
             with cols[1]:
-                tahun = st.selectbox("Tahun", [datetime.now().year - 1, datetime.now().year, datetime.now().year + 1])
+                tahun = st.selectbox("Tahun", [datetime.now().year, datetime.now().year + 1])
             
-            nominal = st.number_input("Nominal Pembayaran (Rp)", min_value=10000, step=100000)
-            bukti = st.file_uploader("Upload Bukti Transfer", type=['jpg', 'jpeg', 'png'])
+            nominal = st.number_input("Nominal (Rp)", min_value=100000, step=50000)
+            bukti = st.file_uploader("Upload Bukti Transfer", type=["jpg", "jpeg", "png"])
             
-            submitted = st.form_submit_button("Kirim Bukti Pembayaran", use_container_width=True)
+            submitted = st.form_submit_button("💾 Simpan Pembayaran", use_container_width=True)
             
-            if submitted and bukti:
-                with st.spinner('Mengupload bukti pembayaran...'):
-                    url = upload_to_cloudinary(bukti, f"bukti_{USERNAME}_{bulan}_{tahun}_{datetime.now().isoformat()}")
-                    ws.append_row([USERNAME, url, bulan, tahun, datetime.now().isoformat(), nominal, "Menunggu Verifikasi"])
-                    st.markdown("<div class='success-box'>Bukti pembayaran berhasil dikirim! Admin akan memverifikasi pembayaran Anda.</div>", unsafe_allow_html=True)
-                    st.rerun()
+            if submitted:
+                if bukti:
+                    with st.spinner("Mengupload bukti pembayaran..."):
+                        url = upload_to_cloudinary(bukti, f"bukti_{USERNAME}_{bulan}_{tahun}")
+                        ws.append_row([
+                            USERNAME, 
+                            url, 
+                            bulan, 
+                            tahun, 
+                            datetime.now().strftime("%Y-%m-%d %H:%M"), 
+                            nominal, 
+                            "Menunggu Verifikasi"
+                        ])
+                        st.markdown("""
+                        <div class="notif-success">
+                            ✅ Bukti pembayaran berhasil dikirim!
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.rerun()
+                else:
+                    st.error("Harap upload bukti pembayaran.")
 
-    st.markdown("---")
-    st.markdown("<h3 style='color: #2c3e50;'>📋 Riwayat Pembayaran Saya</h3>", unsafe_allow_html=True)
-    
+    # Riwayat Pembayaran
+    st.markdown("### 📋 Riwayat Pembayaran")
     if not user_data.empty:
-        for i, row in user_data.sort_values("waktu", ascending=False).iterrows():
-            status_class = "status-" + row['status'].lower().replace(" ", "-")
-            with st.expander(f"{row['bulan']} {row['tahun']} - Rp {row['nominal']:,} - {row['status']}"):
-                st.markdown(f"""
-                <div style='margin-bottom: 15px;'>
-                    <p><b>Status:</b> <span class='{status_class}'>{row['status']}</span></p>
-                    <p><b>Waktu Upload:</b> {row['waktu']}</p>
-                </div>
-                """, unsafe_allow_html=True)
+        for _, row in user_data.sort_values("waktu", ascending=False).iterrows():
+            with st.expander(f"{row['bulan']} {row['tahun']} - Rp {row['nominal']:,}"):
                 st.image(row['bukti'], use_column_width=True)
+                st.markdown(f"""
+                **Status:** <span class="status-{row['status'].lower().replace(' ', '-')}">{row['status']}</span>  
+                **Waktu Upload:** {row['waktu']}
+                """, unsafe_allow_html=True)
                 
-                if st.button(f"Hapus Pembayaran", key=f"hapus_{i}"):
-                    ws.delete_rows(i+2)
-                    st.markdown("<div class='success-box'>Data pembayaran berhasil dihapus.</div>", unsafe_allow_html=True)
+                if st.button("Hapus Pembayaran", key=f"hapus_{row.name}"):
+                    ws.delete_rows(row.name + 2)  # +2 karena header + index 0
+                    st.markdown("""
+                    <div class="notif-success">
+                        ✅ Pembayaran berhasil dihapus
+                    </div>
+                    """, unsafe_allow_html=True)
                     st.rerun()
     else:
-        st.markdown("<div class='info-box'>Anda belum memiliki riwayat pembayaran.</div>", unsafe_allow_html=True)
+        st.markdown('<div class="notif-info">Belum ada riwayat pembayaran</div>', unsafe_allow_html=True)
 
+# ======================== Komplain ========================
 def show_komplain():
-    st.markdown(f"""
-    <div style='text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: #2c3e50;'>📢 Komplain & Keluhan</h1>
-        <p style='color: #7f8c8d;'>Sampaikan keluhan Anda dan lihat riwayat komplain</p>
+    st.markdown("""
+    <div class="header">
+        <h1>📢 Komplain & Keluhan</h1>
+        <p>Sampaikan keluhan Anda kepada admin</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -241,54 +302,63 @@ def show_komplain():
     data = pd.DataFrame(ws.get_all_records())
     user_data = data[data['username'] == USERNAME]
 
+    # Form Komplain Baru
     with st.expander("📝 Buat Komplain Baru", expanded=True):
         with st.form("form_komplain"):
-            isi = st.text_area("Deskripsi Komplain/Keluhan", 
-                             placeholder="Tuliskan keluhan Anda secara detail...")
-            foto = st.file_uploader("Upload Foto Pendukung (Opsional)", 
-                                  type=['jpg', 'jpeg', 'png'])
+            isi = st.text_area("Keluhan Anda", placeholder="Tuliskan keluhan secara detail...")
+            foto = st.file_uploader("Foto Pendukung (Opsional)", type=["jpg", "jpeg", "png"])
             
-            submitted = st.form_submit_button("Kirim Komplain", use_container_width=True)
+            submitted = st.form_submit_button("📤 Kirim Komplain", use_container_width=True)
             
-            if submitted and isi:
-                with st.spinner('Mengirim komplain...'):
-                    url = upload_to_cloudinary(foto, f"komplain_{USERNAME}_{datetime.now().isoformat()}") if foto else ""
-                    ws.append_row([USERNAME, isi, url, datetime.now().isoformat(), "Terkirim"])
-                    st.markdown("<div class='success-box'>Komplain berhasil dikirim! Admin akan menindaklanjuti keluhan Anda.</div>", unsafe_allow_html=True)
-                    st.rerun()
+            if submitted:
+                if isi:
+                    with st.spinner("Mengirim komplain..."):
+                        url = upload_to_cloudinary(foto, f"komplain_{USERNAME}_{datetime.now().timestamp()}") if foto else ""
+                        ws.append_row([
+                            USERNAME, 
+                            isi, 
+                            url, 
+                            datetime.now().strftime("%Y-%m-%d %H:%M"), 
+                            "Terkirim"
+                        ])
+                        st.markdown("""
+                        <div class="notif-success">
+                            ✅ Komplain berhasil dikirim!
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.rerun()
+                else:
+                    st.error("Harap isi keluhan Anda.")
 
-    st.markdown("---")
-    st.markdown("<h3 style='color: #2c3e50;'>📜 Riwayat Komplain Saya</h3>", unsafe_allow_html=True)
-    
+    # Riwayat Komplain
+    st.markdown("### 📜 Riwayat Komplain")
     if not user_data.empty:
-        for i, row in user_data.sort_values("waktu", ascending=False).iterrows():
-            status_class = "status-" + row['status'].lower().replace(" ", "-")
+        for _, row in user_data.sort_values("waktu", ascending=False).iterrows():
             with st.expander(f"{row['waktu']} - {row['status']}"):
                 st.markdown(f"""
-                <div style='margin-bottom: 15px;'>
-                    <p><b>Status:</b> <span class='{status_class}'>{row['status']}</span></p>
-                    <p><b>Isi Komplain:</b></p>
-                    <div style='padding: 10px; background-color: #f8f9fa; border-radius: 5px;'>
-                        {row['isi_komplain']}
-                    </div>
-                </div>
+                **Status:** <span class="status-{row['status'].lower().replace(' ', '-')}">{row['status']}</span>
                 """, unsafe_allow_html=True)
-                
+                st.markdown(f"**Isi Komplain:**\n\n{row['isi_komplain']}")
                 if row['link_foto']:
-                    st.image(row['link_foto'], use_column_width=True)
+                    st.image(row['link_foto'], width=200)
                 
-                if st.button(f"Hapus Komplain", key=f"hapus_komplain_{i}"):
-                    ws.delete_rows(i+2)
-                    st.markdown("<div class='success-box'>Komplain berhasil dihapus.</div>", unsafe_allow_html=True)
+                if st.button("Hapus Komplain", key=f"hapus_komplain_{row.name}"):
+                    ws.delete_rows(row.name + 2)
+                    st.markdown("""
+                    <div class="notif-success">
+                        ✅ Komplain berhasil dihapus
+                    </div>
+                    """, unsafe_allow_html=True)
                     st.rerun()
     else:
-        st.markdown("<div class='info-box'>Anda belum pernah mengirim komplain.</div>", unsafe_allow_html=True)
+        st.markdown('<div class="notif-info">Belum ada komplain</div>', unsafe_allow_html=True)
 
+# ======================== Profil ========================
 def show_profil():
-    st.markdown(f"""
-    <div style='text-align: center; padding: 20px; background-color: #f8f9fa; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: #2c3e50;'>👤 Profil Saya</h1>
-        <p style='color: #7f8c8d;'>Kelola informasi profil Anda</p>
+    st.markdown("""
+    <div class="header">
+        <h1>👤 Profil Saya</h1>
+        <p>Kelola informasi profil Anda</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -307,12 +377,12 @@ def show_profil():
     
     with col2:
         with st.form("edit_profil"):
-            st.markdown("<div class='card-title'>📝 Edit Profil</div>", unsafe_allow_html=True)
+            st.markdown("<h3>📝 Edit Profil</h3>", unsafe_allow_html=True)
             
             nama = st.text_input("Nama Lengkap", value=row['nama_lengkap'])
             no_hp = st.text_input("Nomor HP", value=row['no_hp'])
             deskripsi = st.text_area("Deskripsi Tambahan", value=row['deskripsi'])
-            foto = st.file_uploader("Ubah Foto Profil", type=['jpg', 'jpeg', 'png'])
+            foto = st.file_uploader("Ubah Foto Profil", type=["jpg", "jpeg", "png"])
             
             # Cek apakah bisa edit (7 hari setelah terakhir edit)
             edit_allowed = True
@@ -321,7 +391,7 @@ def show_profil():
                 if datetime.now() - last < timedelta(days=7):
                     edit_allowed = False
                     st.markdown(f"""
-                    <div class='warning-box'>
+                    <div class="notif-warning">
                         Anda hanya bisa mengedit profil sekali dalam 7 hari. 
                         Terakhir edit: {row['last_edit']}
                     </div>
@@ -329,12 +399,16 @@ def show_profil():
             except:
                 pass
             
-            submitted = st.form_submit_button("Simpan Perubahan", use_container_width=True, disabled=not edit_allowed)
+            submitted = st.form_submit_button("💾 Simpan Perubahan", use_container_width=True, disabled=not edit_allowed)
             
             if submitted:
                 with st.spinner('Menyimpan perubahan...'):
-                    url = upload_to_cloudinary(foto, f"foto_profil_{USERNAME}_{datetime.now().isoformat()}") if foto else row['foto_profil']
+                    url = upload_to_cloudinary(foto, f"foto_profil_{USERNAME}_{datetime.now().timestamp()}") if foto else row['foto_profil']
                     ws.update(f"D{idx+2}:G{idx+2}", [[nama, no_hp, deskripsi, url]])
                     ws.update_acell(f"I{idx+2}", datetime.now().isoformat())
-                    st.markdown("<div class='success-box'>Profil berhasil diperbarui!</div>", unsafe_allow_html=True)
+                    st.markdown("""
+                    <div class="notif-success">
+                        ✅ Profil berhasil diperbarui!
+                    </div>
+                    """, unsafe_allow_html=True)
                     st.rerun()
