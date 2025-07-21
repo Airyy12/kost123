@@ -139,97 +139,116 @@ def show_dashboard(gsheet):
             </div>
             """, unsafe_allow_html=True)
 
-        # Recent payments section
-        st.markdown("""
-        <div style="margin-top: 30px;">
-            <h3><i class="fas fa-history"></i> Riwayat Pembayaran Terakhir</h3>
-        </div>
-        """, unsafe_allow_html=True)
+       # Di dalam fungsi show_dashboard(), bagian riwayat pembayaran:
+
+# Recent payments section
+st.markdown("""
+<div style="margin-top: 30px;">
+    <h3><i class="fas fa-history"></i> Riwayat Pembayaran Terakhir</h3>
+</div>
+""", unsafe_allow_html=True)
+
+if user_payments:
+    # Prepare payment history data
+    payment_history = []
+    for payment in sorted(user_payments, key=lambda x: x['waktu'], reverse=True)[:5]:
+        # Determine payment status
+        payment_status = payment.get('status', '')
+        if not payment_status:
+            if datetime.strptime(payment['waktu'].split()[0], "%Y-%m-%d") < datetime.now() - timedelta(days=3):
+                payment_status = "Belum Dibayar"
+            else:
+                payment_status = "Menunggu Verifikasi"
         
-        if user_payments:
-            # Prepare payment history data
-            payment_history = []
-            for payment in sorted(user_payments, key=lambda x: x['waktu'], reverse=True)[:5]:
-                payment_history.append({
-                    'Bulan/Tahun': f"{payment['bulan']} {payment['tahun']}",
-                    'Nominal': f"Rp {int(payment['nominal']):,}",
-                    'Metode': payment.get('metode', 'Transfer Bank'),
-                    'Status': payment.get('status', 'Menunggu Verifikasi'),
-                    'Tanggal': payment['waktu'].split()[0],
-                    'Bukti': f"[Lihat]({payment['bukti']})" if payment.get('bukti') else '-'
-                })
-            
-            # Display as styled table
-            st.markdown("""
-            <style>
-                .payment-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .payment-table th {
-                    background-color: #333;
-                    color: white;
-                    padding: 12px;
-                    text-align: left;
-                }
-                .payment-table td {
-                    padding: 10px;
-                    border-bottom: 1px solid #444;
-                }
-                .payment-table tr:nth-child(even) {
-                    background-color: rgba(255,255,255,0.05);
-                }
-                .status-pending { color: #FFC107; }
-                .status-verified { color: #4CAF50; }
-                .status-rejected { color: #F44336; }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # Convert to HTML table
-            table_html = """
-            <table class="payment-table">
-                <thead>
-                    <tr>
-                        <th>Bulan/Tahun</th>
-                        <th>Nominal</th>
-                        <th>Metode</th>
-                        <th>Status</th>
-                        <th>Tanggal</th>
-                        <th>Bukti</th>
-                    </tr>
-                </thead>
-                <tbody>
-            """
-            
-            for payment in payment_history:
-                status_class = ""
-                if 'Menunggu' in payment['Status']:
-                    status_class = "status-pending"
-                elif 'Lunas' in payment['Status']:
-                    status_class = "status-verified"
-                elif 'Ditolak' in payment['Status']:
-                    status_class = "status-rejected"
-                    
-                table_html += f"""
-                <tr>
-                    <td>{payment['Bulan/Tahun']}</td>
-                    <td>{payment['Nominal']}</td>
-                    <td>{payment['Metode']}</td>
-                    <td class="{status_class}">{payment['Status']}</td>
-                    <td>{payment['Tanggal']}</td>
-                    <td>{payment['Bukti']}</td>
-                </tr>
-                """
-            
-            table_html += "</tbody></table>"
-            st.markdown(table_html, unsafe_allow_html=True)
+        payment_history.append({
+            'Bulan/Tahun': f"{payment['bulan']} {payment['tahun']}",
+            'Nominal': f"Rp {int(payment['nominal']):,}",
+            'Metode': payment.get('metode', 'Transfer Bank'),
+            'Status': payment_status,
+            'Tanggal': payment['waktu'].split()[0],
+            'Bukti': f"<a href='{payment['bukti']}' target='_blank'>Lihat</a>" if payment.get('bukti') else '-'
+        })
+    
+    # Display as styled table
+    st.markdown("""
+    <style>
+        .payment-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .payment-table th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 500;
+        }
+        .payment-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #34495e;
+        }
+        .payment-table tr:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        .status-pending { color: #f39c12; font-weight: 500; }
+        .status-paid { color: #2ecc71; font-weight: 500; }
+        .status-unpaid { color: #e74c3c; font-weight: 500; }
+        .status-verified { color: #27ae60; font-weight: 500; }
+        .payment-table a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .payment-table a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    
+    <table class="payment-table">
+        <thead>
+            <tr>
+                <th>Bulan/Tahun</th>
+                <th>Nominal</th>
+                <th>Metode</th>
+                <th>Status</th>
+                <th>Tanggal</th>
+                <th>Bukti</th>
+            </tr>
+        </thead>
+        <tbody>
+    """, unsafe_allow_html=True)
+    
+    for payment in payment_history:
+        # Determine status class
+        status_class = ""
+        if 'Menunggu' in payment['Status']:
+            status_class = "status-pending"
+        elif 'Lunas' in payment['Status'] or 'Diverifikasi' in payment['Status']:
+            status_class = "status-verified"
+        elif 'Belum' in payment['Status']:
+            status_class = "status-unpaid"
         else:
-            st.markdown("""
-            <div style="background-color: rgba(33, 150, 243, 0.1); padding: 20px; border-radius: 8px; text-align: center;">
-                <i class="fas fa-info-circle" style="font-size: 24px; color: #2196F3;"></i>
-                <p style="margin-top: 10px;">Belum ada riwayat pembayaran</p>
-            </div>
-            """, unsafe_allow_html=True)
+            status_class = "status-paid"
+        
+        st.markdown(f"""
+        <tr>
+            <td>{payment['Bulan/Tahun']}</td>
+            <td>{payment['Nominal']}</td>
+            <td>{payment['Metode']}</td>
+            <td class="{status_class}">{payment['Status']}</td>
+            <td>{payment['Tanggal']}</td>
+            <td>{payment['Bukti']}</td>
+        </tr>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</tbody></table>", unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div style="background-color: rgba(52, 152, 219, 0.1); padding: 20px; border-radius: 8px; text-align: center; margin-top: 15px;">
+        <i class="fas fa-info-circle" style="font-size: 24px; color: #3498db;"></i>
+        <p style="margin-top: 10px; color: #7f8c8d;">Belum ada riwayat pembayaran</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Terjadi kesalahan saat memuat dashboard: {str(e)}")
