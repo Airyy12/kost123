@@ -5,8 +5,6 @@ from sheets import connect_gsheet
 from sheets import load_sheet_data, connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
 
-USERNAME = st.session_state.username
-
 def run_penyewa(menu):
     if menu == "Dashboard":
         show_dashboard()
@@ -35,7 +33,7 @@ def show_dashboard():
     komplain_df = load_sheet_data("Komplain")
 
     # Ambil data penyewa saat ini berdasarkan username login
-    username = st.session_state.get("username")
+    username = st.session_state.get("username", "")
     data_user = user_df[user_df['username'] == username].iloc[0]
 
     # Ambil info kamar
@@ -102,6 +100,7 @@ def show_dashboard():
 
 def show_pembayaran():
     st.title("💸 Pembayaran")
+    USERNAME = st.session_state.get("username", "")
     sheet = connect_gsheet()
     ws = sheet.worksheet("Pembayaran")
     data = pd.DataFrame(ws.get_all_records())
@@ -137,6 +136,7 @@ def show_pembayaran():
 
 def show_komplain():
     st.title("📢 Komplain")
+    USERNAME = st.session_state.get("username", "")
     sheet = connect_gsheet()
     ws = sheet.worksheet("Komplain")
     data = pd.DataFrame(ws.get_all_records())
@@ -172,6 +172,7 @@ def show_komplain():
 
 def show_profil():
     st.title("👤 Profil Saya")
+    USERNAME = st.session_state.get("username", "")
     sheet = connect_gsheet()
     ws = sheet.worksheet("User")
     data = pd.DataFrame(ws.get_all_records())
