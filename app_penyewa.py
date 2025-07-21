@@ -24,7 +24,7 @@ def show_dashboard(gsheet):
     st.header("📊 Dashboard Penyewa")
     
     try:
-        # Get user data
+        # Get user data tanpa debug output
         user_ws = gsheet.worksheet("User")
         user_data = user_ws.get_all_records()
         current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
@@ -33,43 +33,47 @@ def show_dashboard(gsheet):
             st.error("Data pengguna tidak ditemukan")
             return
             
-        # Get room data
+        # Get room data tanpa debug output
         room_ws = gsheet.worksheet("Kamar")
         rooms = room_ws.get_all_records()
-        user_room = next((r for r in rooms if r['Nama'] == current_user['kamar']), None) if current_user.get('kamar') else None
-        
-        # Get payment data
+        user_room = next((r for r in rooms if r['Nama'] == current_user['kamar']), None)
+
+        # Get payment data tanpa debug output
         payment_ws = gsheet.worksheet("Pembayaran")
         payments = payment_ws.get_all_records()
         user_payments = [p for p in payments if p['username'] == current_user['username']]
 
         # Display info cards
         col1, col2, col3 = st.columns(3)
+        
+        # Card 1: Kamar Saya
         with col1:
-            room_info = f"""
+            card_content = f"""
             <div class="info-card">
                 <h3>Kamar Saya</h3>
                 <p style="font-size:24px; margin:10px 0;">{current_user.get('kamar', '-')}</p>
             """
             if user_room:
-                room_info += f"""
+                card_content += f"""
                 <p>Status: {user_room.get('Status', '-')}</p>
                 <p>Harga: Rp {int(user_room.get('Harga', 0)):,}/bulan</p>
                 """
             else:
-                room_info += "<p style='color:red;'>Data kamar tidak ditemukan</p>"
-            room_info += "</div>"
-            st.markdown(room_info, unsafe_allow_html=True)
+                card_content += "<p style='color:red;'>Data kamar tidak ditemukan</p>"
+            card_content += "</div>"
+            st.markdown(card_content, unsafe_allow_html=True)
         
+        # Card 2: Status Pembayaran
         with col2:
             st.markdown(f"""
             <div class="info-card">
                 <h3>Status Pembayaran</h3>
                 <p style="font-size:24px; margin:10px 0;">{current_user.get('status_pembayaran', 'Belum Lunas')}</p>
-                <p>Tagihan bulan ini: Rp {int(user_room.get('Harga', 0)) if user_room else 0:,}</p>
+                <p>Tagihan: Rp {int(user_room.get('Harga', 0)) if user_room else 0:,}/bulan</p>
             </div>
             """, unsafe_allow_html=True)
         
+        # Card 3: Kontak Admin
         with col3:
             st.markdown("""
             <div class="info-card">
@@ -79,27 +83,27 @@ def show_dashboard(gsheet):
                 <p>🏢 Jl. Kost No.123</p>
             </div>
             """, unsafe_allow_html=True)
-        
-        # Recent payments
+
+        # Riwayat Pembayaran
         st.subheader("💸 Riwayat Pembayaran Terakhir")
         if user_payments:
-            # Process payment data
-            payment_data = []
-            for payment in user_payments[-5:]:  # Ambil 5 terakhir
-                payment_data.append({
-                    'Periode': f"{payment['bulan']} {payment['tahun']}",
+            # Format data untuk ditampilkan
+            payment_history = []
+            for payment in sorted(user_payments, key=lambda x: x['waktu'], reverse=True)[:5]:
+                payment_history.append({
+                    'Bulan/Tahun': f"{payment['bulan']} {payment['tahun']}",
                     'Nominal': f"Rp {int(payment['nominal']):,}",
                     'Status': payment.get('status', 'Menunggu Verifikasi'),
-                    'Waktu': payment['waktu'].split()[0]  # Ambil tanggal saja
+                    'Tanggal': payment['waktu'].split()[0]
                 })
             
-            # Display as table
-            st.table(payment_data)
+            # Tampilkan sebagai tabel
+            st.table(payment_history)
         else:
             st.info("Belum ada riwayat pembayaran")
-            
+
     except Exception as e:
-        st.error(f"Terjadi kesalahan saat memuat data: {e}")
+        st.error(f"Terjadi kesalahan: {str(e)}")
         
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
