@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 from sheets import connect_gsheet
+from sheets import load_sheet_data, connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
 
 USERNAME = st.session_state.username
@@ -21,11 +22,6 @@ def run_penyewa(menu):
         st.session_state.role = None
         st.session_state.menu = None
         st.rerun()
-
-dimport streamlit as st
-import pandas as pd
-from sheets import load_sheet_data
-from datetime import datetime
 
 def show_dashboard():
     st.markdown("<h1 style='text-align: center;'>👋 Selamat datang, {}</h1>".format(
