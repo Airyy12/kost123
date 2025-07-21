@@ -51,24 +51,38 @@ def dashboard_penyewa(current_user):
             st.warning("Anda belum memiliki kamar yang terdaftar")
     
     with col2:
-        st.subheader("💳 Status Pembayaran Terakhir")
+        st.subheader("💳 Riwayat Pembayaran Terakhir")
+        
         if current_user:
             pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
             pembayaran_data = pembayaran_ws.get_all_records()
             user_payments = [p for p in pembayaran_data if p['username'] == current_user['username']]
             
             if user_payments:
-                latest_payment = max(user_payments, key=lambda x: datetime.strptime(x['waktu'], "%Y-%m-%d %H:%M:%S"))
-                status_color = "green" if latest_payment['status'] == "Lunas" else "red"
+                # Ambil 3 pembayaran terakhir
+                latest_payments = sorted(user_payments, key=lambda x: x['waktu'], reverse=True)[:3]
                 
-                st.markdown(f"""
-                <div class="info-card">
-                    <h3>Pembayaran {latest_payment['bulan']} {latest_payment['tahun']}</h3>
-                    <p><b>Nominal:</b> Rp {int(latest_payment['nominal']):,}</p>
-                    <p><b>Status:</b> <span style="color:{status_color}">{latest_payment['status']}</span></p>
-                    <p><b>Waktu:</b> {latest_payment['waktu']}</p>
-                </div>
-                """, unsafe_allow_html=True)
+                for payment in latest_payments:
+                    status_color = "orange" if payment['status'] == "Menunggu Verifikasi" else "green" if payment['status'] == "Lunas" else "red"
+                    
+                    with st.container():
+                        st.markdown(f"""
+                        <div class="info-card" style="margin-bottom:15px;padding:15px;">
+                            <div style="display:flex;justify-content:space-between;">
+                                <div>
+                                    <b>{payment['bulan']} {payment['tahun']}</b>
+                                    <p style="margin:5px 0;font-size:18px;">Rp {int(payment['nominal']):,}</p>
+                                </div>
+                                <div style="color:{status_color};align-self:center;">
+                                    {payment['status']}
+                                </div>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-top:10px;">
+                                <small>{payment['waktu'][:10]}</small>
+                                {f'<a href="{payment["bukti"]}" target="_blank" style="color:#4e8cff;text-decoration:none;">Lihat Bukti</a>' if payment.get('bukti') else ''}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
             else:
                 st.warning("Belum ada riwayat pembayaran")
 
