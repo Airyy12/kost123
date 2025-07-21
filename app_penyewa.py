@@ -36,31 +36,26 @@ def show_dashboard(gsheet):
         # Debug: Tampilkan data user untuk pemeriksaan
         st.write("Debug - Data User:", current_user)
         
-        # Get room data
+        # Get room data - menggunakan 'kamar' bukan 'kamar_id'
         room_ws = gsheet.worksheet("Kamar")
         rooms = room_ws.get_all_records()
         
         user_room = None
-        if 'kamar_id' in current_user and current_user['kamar_id']:
+        if 'kamar' in current_user and current_user['kamar']:
             try:
-                user_room = next((r for r in rooms if str(r.get('id', '')) == str(current_user['kamar_id'])), None)
+                user_room = next((r for r in rooms if str(r.get('nama', '')) == str(current_user['kamar'])), None)
             except (KeyError, StopIteration):
                 user_room = None
         
         # Debug: Tampilkan data kamar untuk pemeriksaan
         st.write("Debug - Data Kamar:", user_room)
         
-        # Get payment data dengan pengecekan kolom yang lebih aman
+        # Get payment data - menyesuaikan dengan struktur yang ada
         payment_ws = gsheet.worksheet("Pembayaran")
         payments = payment_ws.get_all_records()
         
-        user_payments = []
-        if current_user and 'id' in current_user:
-            user_payments = [
-                p for p in payments 
-                if str(p.get('user_id', '')) == str(current_user['id']) or 
-                   str(p.get('user_id', '')) == str(current_user['username'])
-            ]
+        # Mencari pembayaran berdasarkan username
+        user_payments = [p for p in payments if str(p.get('username', '')) == str(current_user['username'])]
         
         # Debug: Tampilkan data pembayaran untuk pemeriksaan
         st.write("Debug - Data Pembayaran:", user_payments)
@@ -68,7 +63,7 @@ def show_dashboard(gsheet):
         # Display info cards
         col1, col2, col3 = st.columns(3)
         with col1:
-            room_name = user_room.get('nama', '-') if user_room else '-'
+            room_name = current_user.get('kamar', '-')
             room_floor = user_room.get('lantai', '-') if user_room else '-'
             room_price = int(user_room.get('harga', 0)) if user_room else 0
             
@@ -82,11 +77,11 @@ def show_dashboard(gsheet):
             """, unsafe_allow_html=True)
         
         with col2:
-            last_payment_status = user_payments[-1].get('status', 'Belum Lunas') if user_payments else 'Belum Lunas'
+            payment_status = current_user.get('status_pembayaran', 'Belum Lunas')
             st.markdown(f"""
             <div class="info-card">
                 <h3>Status Pembayaran</h3>
-                <p style="font-size:24px; margin:10px 0;">{last_payment_status}</p>
+                <p style="font-size:24px; margin:10px 0;">{payment_status}</p>
                 <p>Tagihan bulan ini: Rp {room_price:,}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -104,11 +99,9 @@ def show_dashboard(gsheet):
         # Recent payments
         st.subheader("Riwayat Pembayaran Terakhir")
         if user_payments:
-            # Filter kolom yang ada saja
-            available_columns = []
-            if user_payments:
-                available_columns = [col for col in ['bulan', 'tanggal_bayar', 'jumlah', 'status'] 
-                                  if col in user_payments[0]]
+            # Filter kolom yang ada
+            available_columns = [col for col in ['bulan', 'tanggal', 'jumlah', 'status'] 
+                               if col in user_payments[0]]
             
             if available_columns:
                 df = pd.DataFrame(user_payments[-5:])[available_columns]
@@ -120,8 +113,6 @@ def show_dashboard(gsheet):
             
     except Exception as e:
         st.error(f"Terjadi kesalahan saat memuat data: {str(e)}")
-        st.error("Pastikan semua worksheet dan kolom yang diperlukan sudah ada di Google Sheets")
-        st.error("Worksheet yang diperlukan: User, Kamar, Pembayaran")
         
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
