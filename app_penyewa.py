@@ -28,7 +28,8 @@ from datetime import datetime
 import pandas as pd
 
 def show_dashboard():
-    st.markdown("<h1 style='text-align: center;'>👋 Selamat datang, {}</h1>".format(st.session_state.nama), unsafe_allow_html=True)
+    nama = st.session_state.get("nama", "Penyewa")
+    st.markdown(f"<h1 style='text-align: center;'>👋 Selamat datang, {nama}</h1>", unsafe_allow_html=True)
 
     # Load data dari Google Sheets
     gsheet = connect_gsheet()
