@@ -21,79 +21,73 @@ def run_penyewa(menu):
         st.session_state.role = None
         st.session_state.menu = None
         st.rerun()
-        
-import streamlit as st
-from sheets import connect_gsheet
-from datetime import datetime
-import pandas as pd
 
 def show_dashboard():
-    nama = st.session_state.get("nama", "Penyewa")
-    st.markdown(f"<h1 style='text-align: center;'>👋 Selamat datang, {nama}</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>👋 Selamat datang, {}</h1>".format(
+        st.session_state.get("nama", "Penyewa")), unsafe_allow_html=True)
+    st.write("---")
 
-    # Load data dari Google Sheets
-    gsheet = connect_gsheet()
-    penyewa_df = pd.DataFrame(gsheet.worksheet("penyewa").get_all_records())
-    kamar_df = pd.DataFrame(gsheet.worksheet("kamar").get_all_records())
-    pembayaran_df = pd.DataFrame(gsheet.worksheet("pembayaran").get_all_records())
-    komplain_df = pd.DataFrame(gsheet.worksheet("komplain").get_all_records())
+    # Ambil data dari Google Sheets
+    user_df = load_sheet_data("User")
+    kamar_df = load_sheet_data("Kamar")
+    pembayaran_df = load_sheet_data("Pembayaran")
+    komplain_df = load_sheet_data("Komplain")
 
-    # Data penyewa saat ini
-    current_user = penyewa_df[penyewa_df["nama"] == st.session_state.nama].iloc[0]
-    kamar_user = kamar_df[kamar_df["nama_penyewa"] == st.session_state.nama].iloc[0]
+    # Ambil username saat ini
+    username = st.session_state.get("username", "")
+    user_data = user_df[user_df["username"] == username].iloc[0]
 
-    pembayaran_user = pembayaran_df[pembayaran_df["nama"] == st.session_state.nama]
-    pembayaran_terakhir = pembayaran_user.sort_values(by="timestamp", ascending=False).head(1)
+    # --- PROFIL
+    with st.container():
+        col1, col2 = st.columns(2)
 
-    komplain_user = komplain_df[komplain_df["nama"] == st.session_state.nama]
+        with col1:
+            st.markdown("### 👤 Profil Penyewa")
+            st.image(user_data["foto_profil"], width=100)
+            st.write(f"**Nama:** {user_data['nama_lengkap']}")
+            st.write(f"**No HP:** {user_data['no_hp']}")
+            st.write(f"**Username:** {user_data['username']}")
+            st.write(f"**Kamar:** {user_data['kamar']}")
+            st.write(f"**Deskripsi:** {user_data['deskripsi']}")
+            st.write(f"**Terakhir Edit:** {user_data['last_edit']}")
 
-    # Layout utama 2x2 grid
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("👤 Profil Penyewa")
-        st.markdown(f"""
-        <div style='background-color: #1e1e1e; padding: 20px; border-radius: 12px;'>
-            <b>Nama:</b> {current_user['nama']}<br>
-            <b>No HP:</b> {current_user['no_hp']}<br>
-            <b>Deskripsi:</b> {current_user.get('deskripsi', '—')}<br><br>
-            <img src="{current_user['foto_profil']}" width="100" style="border-radius: 10px;"/>
-        </div>
-        """, unsafe_allow_html=True)
+        # --- INFO KAMAR
+        with col2:
+            st.markdown("### 🛏️ Info Kamar")
+            kamar_data = kamar_df[kamar_df["Nama"] == user_data["kamar"]].iloc[0]
+            st.image(kamar_data["link_foto"], use_column_width=True)
+            st.write(f"**Nama Kamar:** {kamar_data['Nama']}")
+            st.write(f"**Status:** {kamar_data['Status']}")
+            st.write(f"**Harga:** Rp{int(kamar_data['Harga']):,}")
+            st.write(f"**Deskripsi:** {kamar_data['Deskripsi']}")
 
-    with col2:
-        st.subheader("🛏️ Info Kamar")
-        st.markdown(f"""
-        <div style='background-color: #1e1e1e; padding: 20px; border-radius: 12px;'>
-            <b>Nama Kamar:</b> {kamar_user['nama_kamar']}<br>
-            <b>Status:</b> {kamar_user['status']}<br>
-            <b>Harga:</b> Rp {int(kamar_user['harga']):,}/bulan<br>
-            <b>Deskripsi:</b> {kamar_user['deskripsi']}
-        </div>
-        """, unsafe_allow_html=True)
+    st.write("---")
 
-    col3, col4 = st.columns(2)
-    with col3:
-        st.subheader("💬 Riwayat Komplain")
-        if not komplain_user.empty:
-            st.dataframe(komplain_user[["tanggal", "isi", "status"]].sort_values(by="tanggal", ascending=False))
-        else:
-            st.info("Belum ada komplain yang diajukan.")
+    with st.container():
+        col3, col4 = st.columns(2)
 
-    with col4:
-        st.subheader("💳 Pembayaran Terakhir")
-        if not pembayaran_terakhir.empty:
-            row = pembayaran_terakhir.iloc[0]
-            bukti_link = f"<a href='{row['bukti']}' target='_blank'>Lihat Bukti</a>" if row["bukti"] else "—"
-            st.markdown(f"""
-            <div style='background-color: #1e1e1e; padding: 20px; border-radius: 12px;'>
-                <b>Bulan:</b> {row['bulan']}<br>
-                <b>Jumlah:</b> Rp {int(row['jumlah']):,}<br>
-                <b>Tanggal Bayar:</b> {row['timestamp']}<br>
-                <b>Bukti:</b> {bukti_link}
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Belum ada pembayaran tercatat.")
+        # --- RIWAYAT KOMPLAIN
+        with col3:
+            st.markdown("### 💬 Riwayat Komplain")
+            komplain_user = komplain_df[komplain_df["username"] == username]
+            if not komplain_user.empty:
+                st.dataframe(komplain_user[["isi_komplain", "waktu", "status"]].sort_values("waktu", ascending=False))
+            else:
+                st.info("Belum ada komplain.")
+
+        # --- PEMBAYARAN TERAKHIR
+        with col4:
+            st.markdown("### 💳 Pembayaran Terakhir")
+            pembayaran_user = pembayaran_df[pembayaran_df["username"] == username]
+            if not pembayaran_user.empty:
+                last_payment = pembayaran_user.sort_values("waktu", ascending=False).iloc[0]
+                st.write(f"**Bulan:** {last_payment['bulan']}")
+                st.write(f"**Tahun:** {last_payment['tahun']}")
+                st.write(f"**Nominal:** Rp{int(last_payment['nominal']):,}")
+                st.write(f"**Status:** {last_payment['status']}")
+                st.image(last_payment["bukti"], caption="Bukti Pembayaran", width=200)
+            else:
+                st.warning("Belum ada pembayaran.")
 
 def show_pembayaran():
     st.title("💸 Pembayaran")
