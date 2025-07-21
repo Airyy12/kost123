@@ -22,7 +22,7 @@ def run_penyewa(menu):
         st.session_state.menu = None
         st.rerun()
 
-def show_dashboard(user_data, kamar_data, pembayaran_terakhir):
+def show_dashboard():
     st.markdown("# 👋 Selamat datang, **{}**".format(user_data["nama"]))
 
     col1, col2 = st.columns(2)
