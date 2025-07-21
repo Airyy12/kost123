@@ -22,12 +22,12 @@ def run_penyewa(menu):
         st.rerun()
 
 def penyewa_dashboard():
-    st.title("🏠 Beranda Penyewa")
+    st.title("🏠 Dashboard Penyewa")
     
     # Custom CSS
     st.markdown("""
     <style>
-    .info-card {
+    .dashboard-card {
         background: rgba(60,60,60,0.7);
         padding: 15px;
         border-radius: 12px;
@@ -54,57 +54,67 @@ def penyewa_dashboard():
             if user_data.get('foto_profil'):
                 st.image(user_data['foto_profil'], width=120, caption="Foto Profil")
             else:
-                st.image("https://via.placeholder.com/120", width=120, caption="Belum Ada Foto")
+                st.image("https://via.placeholder.com/150?text=No+Photo", width=120, caption="Belum Ada Foto")
         
         with col2:
             st.markdown(f"""
             <div class="welcome-header">Selamat Datang, {user_data.get('nama_lengkap', user_data['username'])}</div>
-            <div class="info-card">
-                <p><strong>Kamar:</strong> {user_data.get('kamar', 'Belum Terdaftar')}</p>
-                <p><strong>Status Pembayaran:</strong> {user_data.get('status_pembayaran', 'Belum Ada Data')}</p>
-                <p><strong>Terdaftar Sejak:</strong> {user_data.get('tanggal_daftar', '-')}</p>
+            <div class="dashboard-card">
+                <p><strong>📌 Kamar:</strong> {user_data.get('kamar', 'Belum Terdaftar')}</p>
+                <p><strong>💰 Status Pembayaran:</strong> {user_data.get('status_pembayaran', 'Belum Ada Data')}</p>
+                <p><strong>📅 Terdaftar Sejak:</strong> {user_data.get('tanggal_daftar', '-')}</p>
             </div>
             """, unsafe_allow_html=True)
         
-        # Info kamar
-        if user_data.get('kamar'):
-            kamar = next((k for k in kamar_data if k['Nama'] == user_data['kamar']), None)
-            if kamar:
-                st.markdown("### Informasi Kamar")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown(f"""
-                    <div class="info-card">
-                        <p><strong>Jenis Kamar:</strong> {kamar['Nama']}</p>
-                        <p><strong>Harga:</strong> Rp {int(kamar['Harga']):,}/bulan</p>
-                        <p><strong>Status:</strong> {kamar['Status']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with col2:
-                    if kamar.get('link_foto'):
-                        st.image(kamar['link_foto'], caption="Foto Kamar", use_container_width=True)
+        # Pembayaran Terdekat
+        st.markdown("### ⏳ Pembayaran Mendatang")
+        today = datetime.now()
+        next_month = today.replace(day=1) + timedelta(days=32)
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <p>Tagihan untuk <strong>{next_month.strftime('%B %Y')}</strong> akan jatuh tempo pada:</p>
+            <h4 style="color: #FFA726;">10 {next_month.strftime('%B %Y')}</h4>
+            <p>Total yang harus dibayar: <strong>Rp 1,500,000</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Riwayat pembayaran terakhir
-        st.markdown("### Riwayat Pembayaran Terakhir")
-        user_payments = [p for p in pembayaran_data if p['username'] == st.session_state.username]
-        if user_payments:
-            latest_payment = sorted(user_payments, key=lambda x: x['waktu'], reverse=True)[0]
-            status_class = "status-lunas" if latest_payment['status'] == 'Lunas' else "status-belum-bayar"
-            
-            st.markdown(f"""
-            <div class="info-card">
-                <p><strong>Periode:</strong> {latest_payment['bulan']} {latest_payment['tahun']}</p>
-                <p><strong>Nominal:</strong> Rp {int(latest_payment['nominal']):,}</p>
-                <p><strong>Status:</strong> <span class="{status_class}">{latest_payment['status']}</span></p>
-                <p><strong>Waktu Pembayaran:</strong> {latest_payment['waktu']}</p>
+        # Aktivitas Terakhir
+        st.markdown("### 📝 Aktivitas Terakhir")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+            <div class="dashboard-card">
+                <p><strong>🛏️ Status Kamar:</strong> Normal</p>
+                <p><strong>🧹 Terakhir Dibersihkan:</strong> 2 hari lalu</p>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.info("Belum ada riwayat pembayaran")
+        with col2:
+            st.markdown("""
+            <div class="dashboard-card">
+                <p><strong>💵 Pembayaran Terakhir:</strong> 15 Mei 2023</p>
+                <p><strong>📢 Komplain Terakhir:</strong> 1 minggu lalu</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Quick Actions
+        st.markdown("### ⚡ Akses Cepat")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("💸 Bayar Sekarang", use_container_width=True):
+                st.session_state.menu = "Pembayaran"
+                st.rerun()
+        with col2:
+            if st.button("📢 Buat Komplain", use_container_width=True):
+                st.session_state.menu = "Komplain"
+                st.rerun()
+        with col3:
+            if st.button("👤 Edit Profil", use_container_width=True):
+                st.session_state.menu = "Profil"
+                st.rerun()
     
     except Exception as e:
         st.error(f"Terjadi kesalahan: {str(e)}")
-
+        
 def pembayaran():
     st.title("💳 Pembayaran")
     
