@@ -180,76 +180,119 @@ def show_dashboard():
     data_komplain = komplain_df[komplain_df['username'] == username]
     riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(5)
 
-    # Layout menggunakan columns dan cards
-    col1, col2 = st.columns(2)
-
+    # --- Modern horizontal info cards ---
+    st.markdown("<div style='margin-bottom: 18px;'>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 2])
     with col1:
-        st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='p-card-title'>👤 Profil Penyewa</div>", unsafe_allow_html=True)
         if data_user.get('foto_profil'):
-            st.image(data_user['foto_profil'], width=180, use_container_width=True)
-        st.markdown(f"""
-        <div style='margin-top: 15px;'>
-            <p><b>Nama:</b> {data_user.get('nama_lengkap','-')}</p>
-            <p><b>No HP:</b> {data_user.get('no_hp','-')}</p>
-            <p><b>Kamar:</b> {data_user.get('kamar','-')}</p>
-            <p><b>Status Pembayaran:</b> <span class='status-{data_user.get('status_pembayaran','').lower()}'>{data_user.get('status_pembayaran','-')}</span></p>
-            <p><b>Terakhir Diubah:</b> {data_user.get('last_edit','-')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
+            st.image(data_user['foto_profil'], width=64)
     with col2:
-        st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='p-card-title'>🛏️ Info Kamar</div>", unsafe_allow_html=True)
-        if data_kamar.get('link_foto'):
-            st.image(data_kamar['link_foto'], width=180, use_container_width=True)
         st.markdown(f"""
-        <div style='margin-top: 15px;'>
-            <p><b>Nama Kamar:</b> {data_kamar.get('Nama','-')}</p>
-            <p><b>Status:</b> {data_kamar.get('Status','-')}</p>
-            <p><b>Harga:</b> Rp{data_kamar.get('Harga',0):,}/bulan</p>
-            <p><b>Fasilitas:</b> {data_kamar.get('Deskripsi','-')}</p>
+        <div style='font-size:1.1em;'><b>{data_user.get('nama_lengkap','-')}</b></div>
+        <div style='color:#aaa;font-size:0.95em;'>Kamar: <b>{data_user.get('kamar','-')}</b></div>
+        <div style='color:#aaa;font-size:0.95em;'>No HP: {data_user.get('no_hp','-')}</div>
+        """, unsafe_allow_html=True)
+    with col3:
+        status = data_user.get('status_pembayaran','-')
+        status_class = "status-" + status.lower()
+        st.markdown(f"""
+        <div style='text-align:right;'>
+            <span class='{status_class}' style='font-size:1.1em;'>{status}</span>
+            <div style='color:#aaa;font-size:0.85em;'>Terakhir edit: {data_user.get('last_edit','-')}</div>
         </div>
         """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- Info kamar ringkas ---
+    st.markdown("<div class='info-card' style='padding:12px 18px;'>", unsafe_allow_html=True)
+    colk1, colk2 = st.columns([1, 4])
+    with colk1:
+        if data_kamar.get('link_foto'):
+            st.image(data_kamar['link_foto'], width=56)
+    with colk2:
+        st.markdown(f"""
+        <b>{data_kamar.get('Nama','-')}</b> | Status: <span style='color:#42A5F5'>{data_kamar.get('Status','-')}</span><br>
+        <span style='font-size:0.97em;'>Harga: <b>Rp{data_kamar.get('Harga',0):,}/bulan</b></span><br>
+        <span style='font-size:0.95em;color:#aaa;'>Fasilitas: {data_kamar.get('Deskripsi','-')}</span>
+        """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- Highlight pembayaran & komplain terakhir ---
+    colA, colB = st.columns(2)
+    with colA:
+        st.markdown("<div class='info-card' style='padding:12px 18px;'>", unsafe_allow_html=True)
+        st.markdown("<div class='p-card-title' style='font-size:1.08em;'>💳 Pembayaran Terakhir</div>", unsafe_allow_html=True)
+        if pembayaran_terakhir:
+            p = pembayaran_terakhir[0]
+            status_class = "status-" + str(p.get('status','')).lower().replace(" ", "-")
+            st.markdown(f"""
+            <div style='display:flex;align-items:center;gap:10px;'>
+                {f"<img src='{p.get('bukti','')}' width='48' style='border-radius:6px;'/>" if p.get('bukti') else ""}
+                <div>
+                    <b>{p.get('bulan','-')} {p.get('tahun','-')}</b><br>
+                    <span style='font-size:0.97em;'>Rp{p.get('nominal',0):,}</span><br>
+                    <span class='{status_class}'>{p.get('status','-')}</span>
+                </div>
+            </div>
+            <div style='font-size:0.85em;color:#aaa;'>Upload: {p.get('waktu','-')}</div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='info-box'>Belum ada pembayaran</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with colB:
+        st.markdown("<div class='info-card' style='padding:12px 18px;'>", unsafe_allow_html=True)
+        st.markdown("<div class='p-card-title' style='font-size:1.08em;'>💬 Komplain Terakhir</div>", unsafe_allow_html=True)
+        if not riwayat_komplain.empty:
+            row = riwayat_komplain.iloc[0]
+            status_class = "status-" + str(row.get('status','')).lower().replace(" ", "-")
+            st.markdown(f"""
+            <div>
+                <span class='{status_class}'>{row.get('status','-')}</span>
+                <div style='font-size:0.93em;color:#aaa;margin-bottom:3px;'>{row.get('waktu','-')}</div>
+                <div style='font-size:0.97em;'>{row.get('isi_komplain','-')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='info-box'>Belum ada komplain</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- Riwayat komplain & pembayaran (ringkas, 2 kolom) ---
     st.markdown("---")
     col3, col4 = st.columns(2)
     with col3:
         st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='p-card-title'>💬 Riwayat Komplain Terakhir</div>", unsafe_allow_html=True)
+        st.markdown("<div class='p-card-title'>📜 Riwayat Komplain</div>", unsafe_allow_html=True)
         if riwayat_komplain.empty:
             st.markdown("<div class='info-box'>Belum ada komplain</div>", unsafe_allow_html=True)
         else:
             for _, row in riwayat_komplain.iterrows():
                 status_class = "status-" + str(row.get('status','')).lower().replace(" ", "-")
                 st.markdown(f"""
-                <div style='margin-bottom: 15px; padding: 10px; background: #23272f; border-radius: 8px;'>
+                <div style='margin-bottom: 10px; padding: 8px; background: #23272f; border-radius: 8px;'>
                     <span class='p-card-time'>{row.get('waktu','-')}</span>
-                    <p><b>Status:</b> <span class='{status_class}'>{row.get('status','-')}</span></p>
-                    <p>{row.get('isi_komplain','-')}</p>
+                    <span class='{status_class}' style='margin-left:8px;'>{row.get('status','-')}</span>
+                    <div style='font-size:0.97em;'>{row.get('isi_komplain','-')}</div>
                 </div>
                 """, unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     with col4:
         st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='p-card-title'>💳 Pembayaran Terakhir</div>", unsafe_allow_html=True)
-        if pembayaran_terakhir:
-            p = pembayaran_terakhir[0]
-            status_class = "status-" + str(p.get('status','')).lower().replace(" ", "-")
-            if p.get("bukti"):
-                st.image(p["bukti"], width=180, use_container_width=True)
-            st.markdown(f"""
-            <div style='margin-top: 15px;'>
-                <p><b>Periode:</b> {p.get('bulan','-')} {p.get('tahun','-')}</p>
-                <p><b>Nominal:</b> Rp{p.get('nominal',0):,}</p>
-                <p><b>Status:</b> <span class='{status_class}'>{p.get('status','-')}</span></p>
-                <p><b>Waktu Upload:</b> {p.get('waktu','-')}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("<div class='p-card-title'>📋 Riwayat Pembayaran</div>", unsafe_allow_html=True)
+        if not data_pembayaran.empty:
+            for _, p in data_pembayaran.sort_values("waktu", ascending=False).head(5).iterrows():
+                status_class = "status-" + str(p.get('status','')).lower().replace(" ", "-")
+                st.markdown(f"""
+                <div style='margin-bottom: 10px; padding: 8px; background: #23272f; border-radius: 8px;display:flex;align-items:center;gap:10px;'>
+                    {f"<img src='{p.get('bukti','')}' width='36' style='border-radius:5px;'/>" if p.get('bukti') else ""}
+                    <div>
+                        <b>{p.get('bulan','-')} {p.get('tahun','-')}</b> <span class='{status_class}' style='margin-left:8px;'>{p.get('status','-')}</span><br>
+                        <span style='font-size:0.95em;'>Rp{p.get('nominal',0):,}</span>
+                        <div style='font-size:0.85em;color:#aaa;'>Upload: {p.get('waktu','-')}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.markdown("<div class='warning-box'>Belum ada pembayaran tercatat</div>", unsafe_allow_html=True)
+            st.markdown("<div class='info-box'>Belum ada pembayaran</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 def show_pembayaran():
