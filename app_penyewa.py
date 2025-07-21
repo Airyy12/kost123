@@ -22,6 +22,9 @@ def run_penyewa(menu):
 
 
 
+import streamlit as st
+from datetime import datetime
+
 def show_dashboard(gsheet):
     # Tambahkan CSS dan Font Awesome
     st.markdown("""
@@ -87,7 +90,7 @@ def show_dashboard(gsheet):
     st.header("📊 Dashboard Penyewa")
 
     try:
-        # ==================== LOAD DATA ====================
+        # ========== LOAD DATA ==========
         try:
             user_ws = gsheet.worksheet("User")
             user_data = user_ws.get_all_records()
@@ -109,7 +112,7 @@ def show_dashboard(gsheet):
             st.error(f"🔴 Gagal memuat data: {str(load_error)}")
             st.stop()
 
-        # ==================== INFO CARDS ====================
+        # ========== INFO CARDS ==========
         col1, col2, col3 = st.columns(3)
         
         # Card 1: Kamar Saya
@@ -211,7 +214,7 @@ def show_dashboard(gsheet):
             </div>
             """, unsafe_allow_html=True)
 
-        # ==================== RIWAYAT PEMBAYARAN ====================
+        # ========== RIWAYAT PEMBAYARAN ==========
         st.markdown("""
         <div style="margin: 30px 0 15px; border-bottom: 1px solid #444; padding-bottom: 10px;">
             <h3><i class="fas fa-history"></i> Riwayat Pembayaran Terakhir</h3>
@@ -219,15 +222,20 @@ def show_dashboard(gsheet):
         """, unsafe_allow_html=True)
 
         if user_payments:
-            def format_status(status):
-                status = status.lower()
+            def format_status(status, bukti):
+                status = str(status).lower().strip()
+                bukti = str(bukti).strip()
+
                 if status in ['lunas', 'diverifikasi']:
                     return ('Lunas', 'check-circle', 'status-lunas')
                 elif status in ['menunggu verifikasi', 'proses verifikasi']:
                     return ('Menunggu Verifikasi', 'hourglass-half', 'status-menunggu')
                 elif status in ['ditolak', 'gagal']:
                     return ('Ditolak', 'times-circle', 'status-belum')
-                return ('Belum Dibayar', 'exclamation-circle', 'status-belum')
+                elif bukti:  # Jika ada bukti tapi status masih kosong
+                    return ('Menunggu Verifikasi', 'hourglass-half', 'status-menunggu')
+                else:
+                    return ('Belum Dibayar', 'exclamation-circle', 'status-belum')
 
             latest_payments = sorted(
                 user_payments,
@@ -263,15 +271,14 @@ def show_dashboard(gsheet):
                     nominal_str = "-"
 
                 metode = pay.get('metode', 'Transfer Bank')
-
+                bukti_url = pay.get('bukti', '')
                 status_raw = pay.get('status', '')
-                status_label, icon, css_class = format_status(status_raw)
+                status_label, icon, css_class = format_status(status_raw, bukti_url)
 
                 tanggal = "-"
                 if pay.get('waktu'):
                     tanggal = pay['waktu'].split()[0]
 
-                bukti_url = pay.get('bukti', '')
                 bukti_html = f"""
                 <a href="{bukti_url}" target="_blank" class="payment-link">
                     <i class="fas fa-file-invoice"></i> Lihat
