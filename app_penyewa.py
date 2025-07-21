@@ -1,225 +1,181 @@
 import streamlit as st
-from sheets import connect_gsheet
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
+from sheets import connect_gsheet
 from cloudinary_upload import upload_to_cloudinary
 
+USERNAME = st.session_state.username
+
 def run_penyewa(menu):
-    st.title(f"👋 Selamat datang, {st.session_state.username}")
-    
-    # Dapatkan data user
-    user_ws = connect_gsheet().worksheet("User")
-    user_data = user_ws.get_all_records()
-    current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
-    
     if menu == "Dashboard":
-        dashboard_penyewa(current_user)
+        show_dashboard()
     elif menu == "Pembayaran":
-        pembayaran_penyewa(current_user)
+        show_pembayaran()
     elif menu == "Komplain":
-        komplain_penyewa(current_user)
+        show_komplain()
     elif menu == "Profil Saya":
-        profil_penyewa(current_user)
+        show_profil()
     elif menu == "Logout":
         st.session_state.login_status = False
-        st.session_state.role = None
         st.session_state.username = ""
+        st.session_state.role = None
+        st.session_state.menu = None
         st.rerun()
 
-def dashboard_penyewa(current_user):
+def show_dashboard():
+    st.title("📊 Dashboard Penyewa")
+    sheet = connect_gsheet()
+    user_ws = sheet.worksheet("User")
+    kamar_ws = sheet.worksheet("Kamar")
+    pembayaran_ws = sheet.worksheet("Pembayaran")
+    komplain_ws = sheet.worksheet("Komplain")
+
+    users = pd.DataFrame(user_ws.get_all_records())
+    user_data = users[users['username'] == USERNAME].iloc[0]
+
+    kamar_data = pd.DataFrame(kamar_ws.get_all_records())
+    kamar = kamar_data[kamar_data['Nama'] == user_data['kamar']].iloc[0] if user_data['kamar'] else {}
+
+    pembayaran_data = pd.DataFrame(pembayaran_ws.get_all_records())
+    user_pembayaran = pembayaran_data[pembayaran_data['username'] == USERNAME].sort_values(by='waktu', ascending=False)
+
+    komplain_data = pd.DataFrame(komplain_ws.get_all_records())
+    user_komplain = komplain_data[komplain_data['username'] == USERNAME]
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
-        st.subheader("📌 Informasi Kamar Anda")
-        if current_user and current_user['kamar']:
-            kamar_ws = connect_gsheet().worksheet("Kamar")
-            kamar_data = kamar_ws.get_all_records()
-            kamar_user = next((k for k in kamar_data if k['Nama'] == current_user['kamar']), None)
-            
-            if kamar_user:
-                st.markdown(f"""
-                <div class="info-card">
-                    <h3>{kamar_user['Nama']}</h3>
-                    <p><b>Status:</b> {kamar_user['Status']}</p>
-                    <p><b>Harga:</b> Rp {kamar_user['Harga']:,}/bulan</p>
-                    <p><b>Deskripsi:</b> {kamar_user['Deskripsi']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.warning("Anda belum memiliki kamar yang terdaftar")
-        else:
-            st.warning("Anda belum memiliki kamar yang terdaftar")
-    
+        st.markdown(f"### 👤 {user_data['nama_lengkap']}")
+        st.image(user_data['foto_profil'], width=150)
+        st.markdown(f"📱 {user_data['no_hp']}")
+        st.markdown(f"📝 {user_data['deskripsi']}")
+
     with col2:
-        st.subheader("💳 Riwayat Pembayaran Terakhir")
-        
-        if current_user:
-            pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
-            pembayaran_data = pembayaran_ws.get_all_records()
-            user_payments = [p for p in pembayaran_data if p['username'] == current_user['username']]
-            
-            if user_payments:
-                # Ambil 3 pembayaran terakhir
-                latest_payments = sorted(user_payments, key=lambda x: x['waktu'], reverse=True)[:3]
-                
-                for payment in latest_payments:
-                    status_color = "orange" if payment['status'] == "Menunggu Verifikasi" else "green" if payment['status'] == "Lunas" else "red"
-                    
-                    with st.container():
-                        st.markdown(f"""
-                        <div class="info-card" style="margin-bottom:15px;padding:15px;">
-                            <div style="display:flex;justify-content:space-between;">
-                                <div>
-                                    <b>{payment['bulan']} {payment['tahun']}</b>
-                                    <p style="margin:5px 0;font-size:18px;">Rp {int(payment['nominal']):,}</p>
-                                </div>
-                                <div style="color:{status_color};align-self:center;">
-                                    {payment['status']}
-                                </div>
-                            </div>
-                            <div style="display:flex;justify-content:space-between;margin-top:10px;">
-                                <small>{payment['waktu'][:10]}</small>
-                                {f'<a href="{payment["bukti"]}" target="_blank" style="color:#4e8cff;text-decoration:none;">Lihat Bukti</a>' if payment.get('bukti') else ''}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-            else:
-                st.warning("Belum ada riwayat pembayaran")
+        st.markdown(f"### 🏠 Kamar: {user_data['kamar']}")
+        if kamar:
+            st.markdown(f"**Status**: {kamar['Status']}  ")
+            st.markdown(f"**Harga**: Rp {kamar['Harga']:,}")
+            st.markdown(f"**Deskripsi**: {kamar['Deskripsi']}")
+            st.image(kamar['link_foto'], width=200)
 
-def pembayaran_penyewa(current_user):
-    st.subheader("💳 Pembayaran Sewa Kamar")
-    
-    tab1, tab2 = st.tabs(["Bayar Sekarang", "Riwayat Pembayaran"])
-    
-    with tab1:
-        if current_user and current_user['kamar']:
-            kamar_ws = connect_gsheet().worksheet("Kamar")
-            kamar_data = kamar_ws.get_all_records()
-            kamar_user = next((k for k in kamar_data if k['Nama'] == current_user['kamar']), None)
-            
-            if kamar_user:
-                with st.form("form_pembayaran"):
-                    bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", 
-                                                "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
-                    tahun = st.selectbox("Tahun", [datetime.now().year, datetime.now().year + 1])
-                    nominal = st.number_input("Nominal Pembayaran", value=int(kamar_user['Harga']))
-                    bukti = st.file_uploader("Upload Bukti Pembayaran", type=["jpg", "png", "jpeg"])
-                    
-                    if st.form_submit_button("Kirim Pembayaran"):
-                        if bukti is not None:
-                            # Generate unique filename
-                            filename = f"pembayaran_{current_user['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                            
-                            # Upload to Cloudinary
-                            bukti_url = upload_to_cloudinary(bukti, filename)
-                            
-                            if bukti_url:
-                                pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
-                                new_payment = {
-                                    'username': current_user['username'],
-                                    'bukti': bukti_url,
-                                    'bulan': bulan,
-                                    'tahun': str(tahun),
-                                    'nominal': str(nominal),
-                                    'status': "Menunggu Verifikasi",
-                                    'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                }
-                                pembayaran_ws.append_row(list(new_payment.values()))
-                                st.success("Pembayaran berhasil dikirim, menunggu verifikasi admin")
-                            else:
-                                st.error("Gagal mengupload bukti pembayaran")
-                        else:
-                            st.error("Harap upload bukti pembayaran")
-            else:
-                st.warning("Anda belum memiliki kamar yang terdaftar")
-        else:
-            st.warning("Anda belum memiliki kamar yang terdaftar")
-    
-    with tab2:
-        pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
-        pembayaran_data = pembayaran_ws.get_all_records()
-        user_payments = [p for p in pembayaran_data if p['username'] == current_user['username']]
-        
-        if user_payments:
-            for payment in sorted(user_payments, key=lambda x: x['waktu'], reverse=True):
-                with st.expander(f"Pembayaran {payment['bulan']} {payment['tahun']} - {payment['status']}"):
-                    col1, col2 = st.columns([1, 2])
-                    with col1:
-                        if payment.get('bukti'):
-                            st.image(payment['bukti'], caption="Bukti Pembayaran", width=200)
-                        else:
-                            st.warning("Tidak ada bukti pembayaran")
-                    with col2:
-                        st.markdown(f"""
-                        **Nominal:** Rp {int(payment['nominal']):,}  
-                        **Status:** {payment['status']}  
-                        **Waktu:** {payment['waktu']}
-                        """)
-        else:
-            st.info("Belum ada riwayat pembayaran")
-
-def komplain_penyewa(current_user):
-    st.subheader("📢 Buat Komplain/Pengaduan")
-    
-    with st.form("form_komplain"):
-        isi_komplain = st.text_area("Isi Komplain/Pengaduan", height=150)
-        foto_komplain = st.file_uploader("Upload Foto Pendukung (jika ada)", type=["jpg", "png", "jpeg"])
-        
-        if st.form_submit_button("Kirim Komplain"):
-            if isi_komplain.strip():
-                foto_url = ""
-                if foto_komplain:
-                    # Generate unique filename
-                    filename = f"komplain_{current_user['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                    foto_url = upload_to_cloudinary(foto_komplain, filename)
-                
-                komplain_ws = connect_gsheet().worksheet("Komplain")
-                new_complaint = {
-                    'username': current_user['username'],
-                    'isi_komplain': isi_komplain,
-                    'link_foto': foto_url,
-                    'waktu': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'status': "Menunggu Respon"
-                }
-                komplain_ws.append_row(list(new_complaint.values()))
-                st.success("Komplain berhasil dikirim, admin akan segera merespon")
-            else:
-                st.error("Isi komplain tidak boleh kosong")
-    
-    st.subheader("📋 Riwayat Komplain")
-    komplain_ws = connect_gsheet().worksheet("Komplain")
-    komplain_data = komplain_ws.get_all_records()
-    user_complaints = [k for k in komplain_data if k['username'] == current_user['username']]
-    
-    if user_complaints:
-        for complaint in sorted(user_complaints, key=lambda x: x['waktu'], reverse=True):
-            with st.expander(f"Komplain - {complaint['waktu']}"):
-                if complaint.get('link_foto'):
-                    st.image(complaint['link_foto'], caption="Foto Pendukung", width=300)
-                st.markdown(f"""
-                **Status:** {complaint['status']}  
-                **Isi Komplain:**  
-                {complaint['isi_komplain']}
-                """)
+    st.markdown("---")
+    st.markdown(f"### 💸 Status Pembayaran Terbaru")
+    if not user_pembayaran.empty:
+        latest = user_pembayaran.iloc[0]
+        st.markdown(f"- Bulan: {latest['bulan']} {latest['tahun']}")
+        st.markdown(f"- Nominal: Rp {latest['nominal']:,}")
+        st.markdown(f"- Status: **{latest['status']}**")
+        st.image(latest['bukti'], width=300)
     else:
-        st.info("Belum ada riwayat komplain")
+        st.info("Belum ada pembayaran yang tercatat.")
 
-def profil_penyewa(current_user):
-    st.subheader("👤 Profil Saya")
-    
-    if current_user:
-        with st.form("form_profil"):
-            nama_lengkap = st.text_input("Nama Lengkap", value=current_user.get('nama_lengkap', ''))
-            no_hp = st.text_input("Nomor HP", value=current_user.get('no_hp', ''))
-            
-            if st.form_submit_button("Update Profil"):
-                user_ws = connect_gsheet().worksheet("User")
-                all_users = user_ws.get_all_records()
-                
-                for i, user in enumerate(all_users, start=2):
-                    if user['username'] == current_user['username']:
-                        user_ws.update_cell(i, 4, nama_lengkap)  # Kolom nama_lengkap
-                        user_ws.update_cell(i, 5, no_hp)        # Kolom no_hp
-                        user_ws.update_cell(i, 9, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))  # Kolom last_edit
-                        st.success("Profil berhasil diperbarui")
-                        st.rerun()
+    st.markdown("---")
+    st.markdown(f"### 📢 Komplain Terkirim: {len(user_komplain)} item")
+
+
+def show_pembayaran():
+    st.title("💸 Pembayaran")
+    sheet = connect_gsheet()
+    ws = sheet.worksheet("Pembayaran")
+    data = pd.DataFrame(ws.get_all_records())
+    user_data = data[data['username'] == USERNAME]
+
+    st.subheader("Upload Bukti Pembayaran")
+    with st.form("form_bayar"):
+        bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
+        tahun = st.selectbox("Tahun", [datetime.now().year - 1, datetime.now().year])
+        nominal = st.number_input("Nominal (Rp)", min_value=10000)
+        bukti = st.file_uploader("Upload Bukti Pembayaran")
+        submit = st.form_submit_button("Kirim")
+
+        if submit and bukti:
+            url = upload_to_cloudinary(bukti, f"bukti_{USERNAME}_{bulan}_{tahun}_{datetime.now().isoformat()}")
+            ws.append_row([USERNAME, url, bulan, tahun, datetime.now().isoformat(), nominal, "Menunggu Verifikasi"])
+            st.success("Bukti pembayaran berhasil dikirim!")
+            st.experimental_rerun()
+
+    st.markdown("---")
+    st.subheader("Riwayat Pembayaran Saya")
+    if not user_data.empty:
+        for i, row in user_data.iterrows():
+            with st.expander(f"{row['bulan']} {row['tahun']} - Rp {row['nominal']:,} [{row['status']}]"):
+                st.image(row['bukti'], width=300)
+                if st.button(f"Hapus Pembayaran {i}", key=f"hapus_{i}"):
+                    ws.delete_rows(i+2)  # header + index
+                    st.success("Dihapus.")
+                    st.experimental_rerun()
+    else:
+        st.info("Belum ada pembayaran.")
+
+
+def show_komplain():
+    st.title("📢 Komplain")
+    sheet = connect_gsheet()
+    ws = sheet.worksheet("Komplain")
+    data = pd.DataFrame(ws.get_all_records())
+    user_data = data[data['username'] == USERNAME]
+
+    st.subheader("Kirim Komplain Baru")
+    with st.form("form_komplain"):
+        isi = st.text_area("Isi Komplain")
+        foto = st.file_uploader("Upload Foto (Opsional)")
+        submit = st.form_submit_button("Kirim Komplain")
+
+        if submit and isi:
+            url = upload_to_cloudinary(foto, f"komplain_{USERNAME}_{datetime.now().isoformat()}") if foto else ""
+            ws.append_row([USERNAME, isi, url, datetime.now().isoformat(), "Terkirim"])
+            st.success("Komplain berhasil dikirim!")
+            st.experimental_rerun()
+
+    st.markdown("---")
+    st.subheader("Riwayat Komplain Saya")
+    if not user_data.empty:
+        for i, row in user_data.iterrows():
+            with st.expander(f"{row['waktu']} - {row['status']}"):
+                st.markdown(row['isi_komplain'])
+                if row['link_foto']:
+                    st.image(row['link_foto'], width=300)
+                if st.button(f"Hapus Komplain {i}", key=f"hapus_komplain_{i}"):
+                    ws.delete_rows(i+2)
+                    st.success("Komplain dihapus.")
+                    st.experimental_rerun()
+    else:
+        st.info("Belum ada komplain.")
+
+
+def show_profil():
+    st.title("👤 Profil Saya")
+    sheet = connect_gsheet()
+    ws = sheet.worksheet("User")
+    data = pd.DataFrame(ws.get_all_records())
+    idx = data.index[data['username'] == USERNAME].tolist()[0]
+    row = data.iloc[idx]
+
+    st.image(row['foto_profil'], width=150)
+    st.markdown(f"**Terakhir Edit:** {row['last_edit']}")
+
+    edit_allowed = True
+    try:
+        last = datetime.fromisoformat(row['last_edit'])
+        if datetime.now() - last < timedelta(days=7):
+            edit_allowed = False
+    except:
+        pass
+
+    with st.form("edit_profil"):
+        nama = st.text_input("Nama Lengkap", value=row['nama_lengkap'])
+        no_hp = st.text_input("No HP", value=row['no_hp'])
+        deskripsi = st.text_area("Deskripsi", value=row['deskripsi'])
+        foto = st.file_uploader("Ganti Foto Profil")
+        submit = st.form_submit_button("Simpan Perubahan")
+
+        if not edit_allowed:
+            st.warning("Profil hanya bisa diedit sekali setiap 7 hari.")
+            st.stop()
+
+        if submit:
+            url = upload_to_cloudinary(foto, f"foto_profil_{USERNAME}_{datetime.now().isoformat()}") if foto else row['foto_profil']
+            ws.update(f"D{idx+2}:G{idx+2}", [[nama, no_hp, deskripsi, url]])
+            ws.update_acell(f"I{idx+2}", datetime.now().isoformat())
+            st.success("Profil berhasil diperbarui!")
+            st.experimental_rerun()
