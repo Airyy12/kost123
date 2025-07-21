@@ -21,9 +21,38 @@ def run_penyewa(menu):
         st.session_state.role = None
         st.session_state.menu = None
         st.rerun()
-
 def show_dashboard():
-    st.markdown("# 👋 Selamat datang, **{}**".format(user_data["nama"]))
+    # Ambil data dari Google Sheets
+    import pandas as pd
+    from sheets import load_sheet_data
+
+    df_user = load_sheet_data("user")
+    df_kamar = load_sheet_data("kamar")
+    df_pembayaran = load_sheet_data("pembayaran")
+
+    # Cek username login
+    username = st.session_state.username
+    data_user = df_user[df_user["username"] == username].iloc[0]
+
+    # Ambil data kamar terkait
+    kamar = data_user["kamar"]
+    data_kamar = df_kamar[df_kamar["Nama"] == kamar].iloc[0]
+
+    # Cari pembayaran terakhir user
+    df_pembayaran_user = df_pembayaran[df_pembayaran["username"] == username]
+    if not df_pembayaran_user.empty:
+        last_row = df_pembayaran_user.sort_values(by="waktu", ascending=False).iloc[0]
+        pembayaran_terakhir = {
+            "bulan": f"{last_row['bulan']} {last_row['tahun']}",
+            "jumlah": last_row["nominal"],
+            "tanggal": last_row["waktu"],
+            "bukti": last_row["bukti"]
+        }
+    else:
+        pembayaran_terakhir = None
+
+    # Tampilkan UI
+    st.markdown("# 👋 Selamat datang, **{}**".format(data_user["nama_lengkap"]))
 
     col1, col2 = st.columns(2)
 
@@ -32,10 +61,10 @@ def show_dashboard():
         st.markdown(
             f"""
             <div style="background-color:#222;padding:1.5rem;border-radius:1rem">
-                <h3>Kamar {kamar_data['nama_kamar']}</h3>
-                <p><strong>Status:</strong> {kamar_data['status']}</p>
-                <p><strong>Harga:</strong> Rp {kamar_data['harga']:,}/bulan</p>
-                <p><strong>Deskripsi:</strong> {kamar_data['deskripsi']}</p>
+                <h3>Kamar {data_kamar['Nama']}</h3>
+                <p><strong>Status:</strong> {data_kamar['Status']}</p>
+                <p><strong>Harga:</strong> Rp {int(data_kamar['Harga']):,}/bulan</p>
+                <p><strong>Deskripsi:</strong> {data_kamar['Deskripsi']}</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -43,21 +72,15 @@ def show_dashboard():
 
     with col2:
         st.markdown("### 💳 Riwayat Pembayaran Terakhir")
-
         if pembayaran_terakhir:
-            bulan_tahun = pembayaran_terakhir["bulan"]
-            jumlah = pembayaran_terakhir["jumlah"]
-            tanggal = pembayaran_terakhir["tanggal"]
-            bukti_link = pembayaran_terakhir["bukti"]
-
             st.markdown(
                 f"""
                 <div style="background-color:#222;padding:1.5rem;border-radius:1rem">
-                    <h4>{bulan_tahun}</h4>
-                    <p><strong>Rp {jumlah:,}</strong></p>
+                    <h4>{pembayaran_terakhir["bulan"]}</h4>
+                    <p><strong>Rp {int(pembayaran_terakhir["jumlah"]):,}</strong></p>
                     <div style="display:flex;justify-content:space-between;margin-top:0.5rem">
-                        <small>{tanggal}</small>
-                        <a href="{bukti_link}" target="_blank">Lihat Bukti</a>
+                        <small>{pembayaran_terakhir["tanggal"]}</small>
+                        <a href="{pembayaran_terakhir["bukti"]}" target="_blank">Lihat Bukti</a>
                     </div>
                 </div>
                 """,
