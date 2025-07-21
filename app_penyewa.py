@@ -26,7 +26,6 @@ def show_dashboard(gsheet):
     try:
         # ==================== LOAD DATA ====================
         try:
-            # Load user data
             user_ws = gsheet.worksheet("User")
             user_data = user_ws.get_all_records()
             current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
@@ -35,19 +34,16 @@ def show_dashboard(gsheet):
                 st.error("🔴 Data pengguna tidak ditemukan")
                 st.stop()
                 
-            # Load room data
             room_ws = gsheet.worksheet("Kamar")
             rooms = room_ws.get_all_records()
             user_room = next((r for r in rooms if r['Nama'] == current_user.get('kamar', '')), None)
             
-            # Load payment data
             payment_ws = gsheet.worksheet("Pembayaran")
             payments = payment_ws.get_all_records()
             user_payments = [p for p in payments if p.get('username') == current_user['username']]
             
         except Exception as load_error:
             st.error(f"🔴 Gagal memuat data: {str(load_error)}")
-            st.error("Pastikan semua worksheet (User, Kamar, Pembayaran) tersedia")
             st.stop()
 
         # ==================== INFO CARDS ====================
