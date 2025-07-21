@@ -42,15 +42,55 @@ def show_dashboard(gsheet):
             color: #ecf0f1;
             font-size: 18px;
         }
+        .payment-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 15px;
+            background-color: #2c3e50;
+            color: white;
+        }
+        .payment-table th {
+            background-color: #34495e;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+        }
+        .payment-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #3d5166;
+        }
+        .payment-table tr:hover {
+            background-color: rgba(52, 152, 219, 0.2);
+        }
+        .status-lunas {
+            color: #2ecc71;
+            font-weight: 500;
+        }
+        .status-menunggu {
+            color: #f39c12;
+            font-weight: 500;
+        }
+        .status-belum {
+            color: #e74c3c;
+            font-weight: 500;
+        }
+        .payment-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .payment-link:hover {
+            text-decoration: underline;
+        }
     </style>
     """, unsafe_allow_html=True)
-    
+
     st.header("📊 Dashboard Penyewa")
-    
+
     try:
         # ==================== LOAD DATA ====================
         try:
-            # Load user data
             user_ws = gsheet.worksheet("User")
             user_data = user_ws.get_all_records()
             current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
@@ -59,141 +99,119 @@ def show_dashboard(gsheet):
                 st.error("🔴 Data pengguna tidak ditemukan")
                 st.stop()
                 
-            # Load room data
             room_ws = gsheet.worksheet("Kamar")
             rooms = room_ws.get_all_records()
             user_room = next((r for r in rooms if r['Nama'] == current_user.get('kamar', '')), None)
             
-            # Load payment data
             payment_ws = gsheet.worksheet("Pembayaran")
             payments = payment_ws.get_all_records()
             user_payments = [p for p in payments if str(p.get('username', '')).strip() == str(current_user['username']).strip()]
             
         except Exception as load_error:
             st.error(f"🔴 Gagal memuat data: {str(load_error)}")
-            st.error("Pastikan semua worksheet (User, Kamar, Pembayaran) tersedia dan format data benar")
             st.stop()
 
         # ==================== INFO CARDS ====================
         col1, col2, col3 = st.columns(3)
         
-        # Card 1: Kamar Saya - Perbaikan untuk handle None
+        # Card 1: Kamar Saya
         with col1:
-            try:
-                room_name = current_user.get('kamar', 'Belum Ada')
-                room_status = user_room.get('Status', 'Tidak Diketahui') if user_room else 'Tidak Diketahui'
-                room_price = int(user_room.get('Harga', 0)) if user_room else 0
-                room_floor = user_room.get('lantai', '-') if user_room else '-'
-                
-                status_color = {
-                    'Terisi': '#4CAF50',
-                    'Tersedia': '#2196F3',
-                    'Perbaikan': '#FF9800'
-                }.get(room_status, '#9E9E9E')
-                
-                st.markdown(f"""
-                <div class="info-card">
-                    <h3><i class="fas fa-door-open"></i> Kamar Saya</h3>
-                    <div style="display: flex; align-items: center; margin: 15px 0 20px;">
-                        <span style="font-size: 28px; font-weight: bold; margin-right: 15px;">
-                            {room_name}
-                        </span>
-                        <span style="padding: 5px 12px; background-color: {status_color}; 
-                              color: white; border-radius: 15px; font-size: 14px;">
-                            {room_status}
-                        </span>
+            room_name = current_user.get('kamar', 'Belum Ada')
+            room_status = user_room.get('Status', 'Tidak Diketahui') if user_room else 'Tidak Diketahui'
+            room_price = int(user_room.get('Harga', 0)) if user_room else 0
+            room_floor = user_room.get('lantai', '-') if user_room else '-'
+            
+            status_color = {
+                'Terisi': '#4CAF50',
+                'Tersedia': '#2196F3',
+                'Perbaikan': '#FF9800'
+            }.get(room_status, '#9E9E9E')
+            
+            st.markdown(f"""
+            <div class="info-card">
+                <h3><i class="fas fa-door-open"></i> Kamar Saya</h3>
+                <div style="display: flex; align-items: center; margin: 15px 0 20px;">
+                    <span style="font-size: 28px; font-weight: bold; margin-right: 15px;">
+                        {room_name}
+                    </span>
+                    <span style="padding: 5px 12px; background-color: {status_color}; 
+                          color: white; border-radius: 15px; font-size: 14px;">
+                        {room_status}
+                    </span>
+                </div>
+                <div style="border-top: 1px solid #444; padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
+                        <span><i class="fas fa-tag"></i> Harga:</span>
+                        <span style="font-weight: 500;">Rp {room_price:,}/bulan</span>
                     </div>
-                    <div style="border-top: 1px solid #444; padding-top: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin: 12px 0;">
-                            <span><i class="fas fa-tag"></i> Harga:</span>
-                            <span style="font-weight: 500;">Rp {room_price:,}/bulan</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin: 12px 0;">
-                            <span><i class="fas fa-layer-group"></i> Lantai:</span>
-                            <span>{room_floor}</span>
-                        </div>
+                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
+                        <span><i class="fas fa-layer-group"></i> Lantai:</span>
+                        <span>{room_floor}</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-            except Exception as card_error:
-                st.error(f"Gagal menampilkan info kamar: {str(card_error)}")
+            </div>
+            """, unsafe_allow_html=True)
 
-        # ... (bagian lainnya tetap sama)
-        # Card 2: Status Pembayaran - Perbaikan untuk handle None
+        # Card 2: Status Pembayaran
         with col2:
-            try:
-                payment_status = current_user.get('status_pembayaran', 'Belum Dibayar')
-                status_icon = {
-                    'Lunas': 'check-circle',
-                    'Belum Dibayar': 'exclamation-circle',
-                    'Menunggu Verifikasi': 'clock',
-                    'Ditolak': 'times-circle'
-                }.get(payment_status, 'question-circle')
-                
-                status_color = {
-                    'Lunas': '#4CAF50',
-                    'Belum Dibayar': '#F44336',
-                    'Menunggu Verifikasi': '#FFC107',
-                    'Ditolak': '#E91E63'
-                }.get(payment_status, '#9E9E9E')
-                
-                # Handle jika user_room None
-                room_price = int(user_room.get('Harga', 0)) if user_room else 0
-                
-                st.markdown(f"""
-                <div class="info-card">
-                    <h3><i class="fas fa-credit-card"></i> Pembayaran</h3>
-                    <div style="text-align: center; margin: 20px 0;">
-                        <i class="fas fa-{status_icon}" 
-                           style="font-size: 42px; color: {status_color}; margin-bottom: 10px;"></i>
-                        <h4 style="color: {status_color}; margin: 5px 0;">{payment_status}</h4>
+            payment_status = current_user.get('status_pembayaran', 'Belum Dibayar')
+            status_config = {
+                'Lunas': {'icon': 'check-circle', 'color': '#4CAF50'},
+                'Belum Dibayar': {'icon': 'exclamation-circle', 'color': '#F44336'},
+                'Menunggu Verifikasi': {'icon': 'hourglass-half', 'color': '#FFC107'},
+                'Ditolak': {'icon': 'times-circle', 'color': '#E91E63'}
+            }
+            config = status_config.get(payment_status, {'icon': 'question-circle', 'color': '#9E9E9E'})
+            
+            st.markdown(f"""
+            <div class="info-card">
+                <h3><i class="fas fa-credit-card"></i> Pembayaran</h3>
+                <div style="text-align: center; margin: 20px 0;">
+                    <i class="fas fa-{config['icon']}" 
+                       style="font-size: 42px; color: {config['color']}; margin-bottom: 10px;"></i>
+                    <h4 style="color: {config['color']}; margin: 5px 0;">{payment_status}</h4>
+                </div>
+                <div style="border-top: 1px solid #444; padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
+                        <span>Tagihan:</span>
+                        <span>Rp {room_price:,}</span>
                     </div>
-                    <div style="border-top: 1px solid #444; padding-top: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin: 12px 0;">
-                            <span>Tagihan:</span>
-                            <span>Rp {room_price:,}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin: 12px 0;">
-                            <span>Tenggat:</span>
-                            <span>10 {datetime.now().strftime('%B %Y')}</span>
-                        </div>
+                    <div style="display: flex; justify-content: space-between; margin: 12px 0;">
+                        <span>Tenggat:</span>
+                        <span>10 {datetime.now().strftime('%B %Y')}</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-            except Exception as card_error:
-                st.error(f"Gagal menampilkan info pembayaran: {str(card_error)}")
+            </div>
+            """, unsafe_allow_html=True)
 
-        # Card 3: Kontak Admin - Tidak banyak perubahan diperlukan
+        # Card 3: Kontak Admin
         with col3:
-            try:
-                st.markdown("""
-                <div class="info-card">
-                    <h3><i class="fas fa-headset"></i> Kontak Admin</h3>
-                    <div style="padding: 15px 0;">
-                        <div style="display: flex; align-items: center; margin: 15px 0;">
-                            <i class="fas fa-phone-alt" style="width: 30px; color: #4CAF50;"></i>
-                            <span>0812-3456-7890</span>
-                        </div>
-                        <div style="display: flex; align-items: center; margin: 15px 0;">
-                            <i class="fas fa-envelope" style="width: 30px; color: #2196F3;"></i>
-                            <span>admin@kost123.com</span>
-                        </div>
-                        <div style="display: flex; align-items: center; margin: 15px 0;">
-                            <i class="fas fa-map-marker-alt" style="width: 30px; color: #F44336;"></i>
-                            <span>Jl. Kost No.123, Jakarta</span>
-                        </div>
+            st.markdown("""
+            <div class="info-card">
+                <h3><i class="fas fa-headset"></i> Kontak Admin</h3>
+                <div style="padding: 15px 0;">
+                    <div style="display: flex; align-items: center; margin: 15px 0;">
+                        <i class="fas fa-phone-alt" style="width: 30px; color: #4CAF50;"></i>
+                        <span>0812-3456-7890</span>
                     </div>
-                    <div style="border-top: 1px solid #444; padding-top: 15px; text-align: center;">
-                        <a href="https://wa.me/6281234567890" target="_blank" 
-                           style="background-color: #25D366; color: white; padding: 8px 16px; 
-                                  border-radius: 4px; text-decoration: none; display: inline-block;">
-                            <i class="fab fa-whatsapp"></i> Hubungi via WhatsApp
-                        </a>
+                    <div style="display: flex; align-items: center; margin: 15px 0;">
+                        <i class="fas fa-envelope" style="width: 30px; color: #2196F3;"></i>
+                        <span>admin@kost123.com</span>
+                    </div>
+                    <div style="display: flex; align-items: center; margin: 15px 0;">
+                        <i class="fas fa-map-marker-alt" style="width: 30px; color: #F44336;"></i>
+                        <span>Jl. Kost No.123, Jakarta</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-            except Exception as card_error:
-                st.error(f"Gagal menampilkan info kontak: {str(card_error)}")
+                <div style="border-top: 1px solid #444; padding-top: 15px; text-align: center;">
+                    <a href="https://wa.me/6281234567890" target="_blank" 
+                       style="background-color: #25D366; color: white; padding: 8px 16px; 
+                              border-radius: 4px; text-decoration: none; display: inline-block;">
+                        <i class="fab fa-whatsapp"></i> Hubungi via WhatsApp
+                    </a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         # ==================== RIWAYAT PEMBAYARAN ====================
         st.markdown("""
@@ -202,212 +220,109 @@ def show_dashboard(gsheet):
         </div>
         """, unsafe_allow_html=True)
 
-        try:
-            if user_payments:
-                # Fungsi untuk menentukan status dengan error handling
-                def determine_payment_status(payment):
-                    try:
-                        # Jika status sudah diisi di sheet, gunakan itu
-                        if payment.get('status'):
-                            return payment['status']
-                        
-                        # Jika ada bukti pembayaran
-                        if payment.get('bukti'):
-                            if payment.get('waktu'):
-                                try:
-                                    payment_date = datetime.strptime(payment['waktu'].split()[0], "%Y-%m-%d")
-                                    if (datetime.now() - payment_date).days > 3:
-                                        return "Belum Diverifikasi"
-                                    return "Menunggu Verifikasi"
-                                except ValueError:
-                                    return "Menunggu Verifikasi"
-                            return "Menunggu Verifikasi"
-                        
-                        return "Belum Dibayar"
-                    except Exception:
-                        return "Status Tidak Diketahui"
+        if user_payments:
+            def get_payment_status(payment):
+                status = payment.get('status', '')
+                if status.lower() in ['lunas', 'diverifikasi']:
+                    return 'Lunas'
+                elif status.lower() in ['menunggu verifikasi', 'proses verifikasi']:
+                    return 'Menunggu Verifikasi'
+                elif status.lower() in ['ditolak', 'gagal']:
+                    return 'Ditolak'
+                return 'Belum Dibayar'
 
-                # Proses data pembayaran dengan error handling lebih robust
-                processed_payments = []
-                for payment in sorted(user_payments, 
-                                   key=lambda x: x.get('waktu', '') or '1970-01-01', 
-                                   reverse=True)[:5]:
-                    try:
-                        status = determine_payment_status(payment)
-                        
-                        # Handle periode
-                        bulan = payment.get('bulan', '')
-                        tahun = payment.get('tahun', '')
-                        periode = f"{bulan} {tahun}" if bulan and tahun else "-"
-                        
-                        # Handle nominal
-                        try:
-                            nominal = f"Rp {int(payment.get('nominal', 0)):,}"
-                        except (ValueError, TypeError):
-                            nominal = "Rp 0"
-                            
-                        # Handle tanggal
-                        tanggal = payment.get('waktu', '').split()[0] if payment.get('waktu') else '-'
-                        
-                        processed_payments.append({
-                            'periode': periode,
-                            'nominal': nominal,
-                            'metode': payment.get('metode', 'Transfer Bank'),
-                            'status': status,
-                            'tanggal': tanggal,
-                            'bukti': payment.get('bukti', '')
-                        })
-                    except Exception as e:
-                        print(f"Error processing payment: {e}")
-                        continue
-
-                # Buat tabel HTML dengan style yang lebih baik
-                table_html = """
-                <style>
-                    .payment-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 15px 0;
-                        font-size: 15px;
-                        background-color: #2c3e50;
-                        color: white;
-                    }
-                    .payment-table th {
-                        background-color: #34495e;
-                        color: white;
-                        padding: 12px 15px;
-                        text-align: left;
-                        position: sticky;
-                        top: 0;
-                    }
-                    .payment-table td {
-                        padding: 12px 15px;
-                        border-bottom: 1px solid #3d5166;
-                    }
-                    .payment-table tr:hover {
-                        background-color: rgba(52, 152, 219, 0.2);
-                    }
-                    .status-lunas {
-                        color: #2ecc71;
-                        font-weight: 500;
-                    }
-                    .status-menunggu {
-                        color: #f39c12;
-                        font-weight: 500;
-                    }
-                    .status-belum {
-                        color: #e74c3c;
-                        font-weight: 500;
-                    }
-                    .payment-link {
-                        color: #3498db;
-                        text-decoration: none;
-                        font-weight: 500;
-                    }
-                    .payment-link:hover {
-                        text-decoration: underline;
-                    }
-                    .table-responsive {
-                        overflow-x: auto;
-                        margin-bottom: 20px;
-                    }
-                </style>
-                <div class="table-responsive">
-                <table class="payment-table">
-                    <thead>
-                        <tr>
-                            <th>Periode</th>
-                            <th>Nominal</th>
-                            <th>Metode</th>
-                            <th>Status</th>
-                            <th>Tanggal</th>
-                            <th>Bukti</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                """
-
-                for payment in processed_payments:
-                    # Tentukan class dan ikon status
-                    status_lower = payment['status'].lower()
-                    if 'lunas' in status_lower or 'verifikasi' in status_lower:
-                        status_class = "status-lunas"
-                        status_icon = "check-circle"
-                    elif 'menunggu' in status_lower or 'proses' in status_lower:
-                        status_class = "status-menunggu"
-                        status_icon = "hourglass-half"
-                    elif 'belum' in status_lower or 'ditolak' in status_lower:
-                        status_class = "status-belum"
-                        status_icon = "times-circle"
-                    else:
-                        status_class = "status-menunggu"
-                        status_icon = "clock"
+            processed_payments = []
+            for payment in sorted(user_payments, 
+                               key=lambda x: x.get('waktu', '') or '1970-01-01', 
+                               reverse=True)[:5]:
+                try:
+                    status = get_payment_status(payment)
+                    bulan = payment.get('bulan', '')
+                    tahun = payment.get('tahun', '')
                     
-                    # Format link bukti dengan validasi URL
-                    bukti = payment['bukti']
-                    if bukti and (bukti.startswith('http://') or bukti.startswith('https://')):
-                        bukti_link = f"""
-                        <a href="{bukti}" target="_blank" class="payment-link">
-                            <i class="fas fa-file-invoice"></i> Lihat
-                        </a>
-                        """
-                    else:
-                        bukti_link = "-"
+                    processed_payments.append({
+                        'periode': f"{bulan} {tahun}" if bulan and tahun else '-',
+                        'nominal': f"Rp {int(payment.get('nominal', 0)):,}",
+                        'metode': payment.get('metode', 'Transfer Bank'),
+                        'status': status,
+                        'tanggal': payment.get('waktu', '').split()[0] if payment.get('waktu') else '-',
+                        'bukti': payment.get('bukti', '')
+                    })
+                except Exception:
+                    continue
 
-                    table_html += f"""
+            # Buat tabel
+            table_html = """
+            <div class="table-responsive">
+            <table class="payment-table">
+                <thead>
                     <tr>
-                        <td>{payment['periode']}</td>
-                        <td>{payment['nominal']}</td>
-                        <td>{payment['metode']}</td>
-                        <td class="{status_class}">
-                            <i class="fas fa-{status_icon}"></i> {payment['status']}
-                        </td>
-                        <td>{payment['tanggal']}</td>
-                        <td>{bukti_link}</td>
+                        <th>Periode</th>
+                        <th>Nominal</th>
+                        <th>Metode</th>
+                        <th>Status</th>
+                        <th>Tanggal</th>
+                        <th>Bukti</th>
                     </tr>
-                    """
+                </thead>
+                <tbody>
+            """
 
-                table_html += """
-                    </tbody>
-                </table>
-                </div>
+            for payment in processed_payments:
+                status_class = {
+                    'Lunas': 'status-lunas',
+                    'Menunggu Verifikasi': 'status-menunggu',
+                    'Ditolak': 'status-belum',
+                    'Belum Dibayar': 'status-belum'
+                }.get(payment['status'], '')
+                
+                status_icon = {
+                    'Lunas': 'check-circle',
+                    'Menunggu Verifikasi': 'hourglass-half',
+                    'Ditolak': 'times-circle',
+                    'Belum Dibayar': 'exclamation-circle'
+                }.get(payment['status'], 'question-circle')
+                
+                bukti_link = f"""
+                <a href="{payment['bukti']}" target="_blank" class="payment-link">
+                    <i class="fas fa-file-invoice"></i> Lihat
+                </a>
+                """ if payment.get('bukti') else '-'
+
+                table_html += f"""
+                <tr>
+                    <td>{payment['periode']}</td>
+                    <td>{payment['nominal']}</td>
+                    <td>{payment['metode']}</td>
+                    <td class="{status_class}">
+                        <i class="fas fa-{status_icon}"></i> {payment['status']}
+                    </td>
+                    <td>{payment['tanggal']}</td>
+                    <td>{bukti_link}</td>
+                </tr>
                 """
-                st.markdown(table_html, unsafe_allow_html=True)
-                
-                # Tambahkan catatan dan tombol untuk melihat semua riwayat
-                st.markdown("""
-                <div style="margin-top: 10px; font-size: 14px; color: #95a5a6; display: flex; justify-content: space-between;">
-                    <span><i class="fas fa-info-circle"></i> Status akan diperbarui setelah admin memverifikasi pembayaran</span>
-                    <a href="#" style="color: #3498db; text-decoration: none;">
-                        <i class="fas fa-list"></i> Lihat Semua Riwayat
-                    </a>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            else:
-                st.markdown("""
-                <div style="background-color: rgba(52, 152, 219, 0.1); 
-                    padding: 25px; border-radius: 8px; text-align: center;
-                    margin: 20px 0;">
-                    <i class="fas fa-info-circle" style="font-size: 28px; color: #3498db;"></i>
-                    <p style="margin-top: 15px; font-size: 16px; color: #7f8c8d;">
-                        Belum ada riwayat pembayaran
-                    </p>
-                    <button style="background-color: #3498db; color: white; border: none; 
-                            padding: 8px 16px; border-radius: 4px; margin-top: 10px;
-                            cursor: pointer;">
-                        <i class="fas fa-plus"></i> Lakukan Pembayaran
-                    </button>
-                </div>
-                """, unsafe_allow_html=True)
-                
-        except Exception as payment_error:
-            st.error(f"🔴 Gagal memuat riwayat pembayaran: {str(payment_error)}")
-            st.error("Silakan refresh halaman atau hubungi admin")
+
+            table_html += """
+                </tbody>
+            </table>
+            </div>
+            """
+            st.markdown(table_html, unsafe_allow_html=True)
+            
+        else:
+            st.markdown("""
+            <div style="background-color: rgba(52, 152, 219, 0.1); 
+                padding: 25px; border-radius: 8px; text-align: center;
+                margin: 20px 0;">
+                <i class="fas fa-info-circle" style="font-size: 28px; color: #3498db;"></i>
+                <p style="margin-top: 15px; font-size: 16px; color: #7f8c8d;">
+                    Belum ada riwayat pembayaran
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"🔴 Terjadi kesalahan sistem: {str(e)}")
-        st.error("Silakan coba lagi nanti atau hubungi admin jika masalah berlanjut")
         
 def show_payment(gsheet):
     st.header("💸 Pembayaran")
