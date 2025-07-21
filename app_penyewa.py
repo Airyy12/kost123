@@ -22,56 +22,49 @@ def run_penyewa(menu):
         st.session_state.menu = None
         st.rerun()
 
-def show_dashboard():
-    st.title("📊 Dashboard Penyewa")
-    sheet = connect_gsheet()
-    user_ws = sheet.worksheet("User")
-    kamar_ws = sheet.worksheet("Kamar")
-    pembayaran_ws = sheet.worksheet("Pembayaran")
-    komplain_ws = sheet.worksheet("Komplain")
-
-    users = pd.DataFrame(user_ws.get_all_records())
-    user_data = users[users['username'] == USERNAME].iloc[0]
-
-    kamar_data = pd.DataFrame(kamar_ws.get_all_records())
-    kamar = kamar_data[kamar_data['Nama'] == user_data['kamar']].iloc[0] if user_data['kamar'] else {}
-
-    pembayaran_data = pd.DataFrame(pembayaran_ws.get_all_records())
-    user_pembayaran = pembayaran_data[pembayaran_data['username'] == USERNAME].sort_values(by='waktu', ascending=False)
-
-    komplain_data = pd.DataFrame(komplain_ws.get_all_records())
-    user_komplain = komplain_data[komplain_data['username'] == USERNAME]
+def dashboard_penyewa(user_data, kamar_data, pembayaran_terakhir):
+    st.markdown("# 👋 Selamat datang, **{}**".format(user_data["nama"]))
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown(f"### 👤 {user_data['nama_lengkap']}")
-        st.image(user_data['foto_profil'], width=150)
-        st.markdown(f"📱 {user_data['no_hp']}")
-        st.markdown(f"📝 {user_data['deskripsi']}")
+        st.markdown("### 📌 Informasi Kamar Anda")
+        st.markdown(
+            f"""
+            <div style="background-color:#222;padding:1.5rem;border-radius:1rem">
+                <h3>Kamar {kamar_data['nama_kamar']}</h3>
+                <p><strong>Status:</strong> {kamar_data['status']}</p>
+                <p><strong>Harga:</strong> Rp {kamar_data['harga']:,}/bulan</p>
+                <p><strong>Deskripsi:</strong> {kamar_data['deskripsi']}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     with col2:
-        st.markdown(f"### 🏠 Kamar: {user_data['kamar']}")
-        if kamar:
-            st.markdown(f"**Status**: {kamar['Status']}  ")
-            st.markdown(f"**Harga**: Rp {kamar['Harga']:,}")
-            st.markdown(f"**Deskripsi**: {kamar['Deskripsi']}")
-            st.image(kamar['link_foto'], width=200)
+        st.markdown("### 💳 Riwayat Pembayaran Terakhir")
 
-    st.markdown("---")
-    st.markdown(f"### 💸 Status Pembayaran Terbaru")
-    if not user_pembayaran.empty:
-        latest = user_pembayaran.iloc[0]
-        st.markdown(f"- Bulan: {latest['bulan']} {latest['tahun']}")
-        st.markdown(f"- Nominal: Rp {latest['nominal']:,}")
-        st.markdown(f"- Status: **{latest['status']}**")
-        st.image(latest['bukti'], width=300)
-    else:
-        st.info("Belum ada pembayaran yang tercatat.")
+        if pembayaran_terakhir:
+            bulan_tahun = pembayaran_terakhir["bulan"]
+            jumlah = pembayaran_terakhir["jumlah"]
+            tanggal = pembayaran_terakhir["tanggal"]
+            bukti_link = pembayaran_terakhir["bukti"]
 
-    st.markdown("---")
-    st.markdown(f"### 📢 Komplain Terkirim: {len(user_komplain)} item")
-
+            st.markdown(
+                f"""
+                <div style="background-color:#222;padding:1.5rem;border-radius:1rem">
+                    <h4>{bulan_tahun}</h4>
+                    <p><strong>Rp {jumlah:,}</strong></p>
+                    <div style="display:flex;justify-content:space-between;margin-top:0.5rem">
+                        <small>{tanggal}</small>
+                        <a href="{bukti_link}" target="_blank">Lihat Bukti</a>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("Belum ada data pembayaran.")
 
 def show_pembayaran():
     st.title("💸 Pembayaran")
