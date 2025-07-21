@@ -26,6 +26,7 @@ def show_dashboard(gsheet):
     try:
         # ==================== LOAD DATA ====================
         try:
+            # Load user data
             user_ws = gsheet.worksheet("User")
             user_data = user_ws.get_all_records()
             current_user = next((u for u in user_data if u['username'] == st.session_state.username), None)
@@ -34,16 +35,19 @@ def show_dashboard(gsheet):
                 st.error("🔴 Data pengguna tidak ditemukan")
                 st.stop()
                 
+            # Load room data
             room_ws = gsheet.worksheet("Kamar")
             rooms = room_ws.get_all_records()
             user_room = next((r for r in rooms if r['Nama'] == current_user.get('kamar', '')), None)
             
+            # Load payment data
             payment_ws = gsheet.worksheet("Pembayaran")
             payments = payment_ws.get_all_records()
-            user_payments = [p for p in payments if p.get('username') == current_user['username']]
+            user_payments = [p for p in payments if str(p.get('username', '')).strip() == str(current_user['username']).strip()]
             
         except Exception as load_error:
             st.error(f"🔴 Gagal memuat data: {str(load_error)}")
+            st.error("Pastikan semua worksheet (User, Kamar, Pembayaran) tersedia dan format data benar")
             st.stop()
 
         # ==================== INFO CARDS ====================
@@ -93,13 +97,15 @@ def show_dashboard(gsheet):
                 status_icon = {
                     'Lunas': 'check-circle',
                     'Belum Dibayar': 'exclamation-circle',
-                    'Menunggu Verifikasi': 'clock'
+                    'Menunggu Verifikasi': 'clock',
+                    'Ditolak': 'times-circle'
                 }.get(payment_status, 'question-circle')
                 
                 status_color = {
                     'Lunas': '#4CAF50',
                     'Belum Dibayar': '#F44336',
-                    'Menunggu Verifikasi': '#FFC107'
+                    'Menunggu Verifikasi': '#FFC107',
+                    'Ditolak': '#E91E63'
                 }.get(payment_status, '#9E9E9E')
                 
                 st.markdown(f"""
@@ -167,33 +173,38 @@ def show_dashboard(gsheet):
         try:
             if user_payments:
                 # Fungsi untuk menentukan status
-                def determine_status(payment):
+                def determine_payment_status(payment):
+                    # Jika status sudah diisi di sheet, gunakan itu
                     if payment.get('status'):
                         return payment['status']
                     
-                    payment_date = datetime.strptime(payment['waktu'].split()[0], "%Y-%m-%d")
-                    days_passed = (datetime.now() - payment_date).days
-                    
-                    if days_passed > 3:
-                        return "Belum Dibayar"
-                    elif payment.get('bukti'):
+                    # Jika ada bukti pembayaran
+                    if payment.get('bukti'):
+                        payment_date = datetime.strptime(payment['waktu'].split()[0], "%Y-%m-%d")
+                        if (datetime.now() - payment_date).days > 3:
+                            return "Belum Diverifikasi"
                         return "Menunggu Verifikasi"
-                    else:
-                        return "Belum Dibayar"
+                    
+                    # Default
+                    return "Belum Dibayar"
 
-                # Proses data pembayaran
+                # Proses data pembayaran dengan error handling
                 processed_payments = []
                 for payment in sorted(user_payments, key=lambda x: x.get('waktu', ''), reverse=True)[:5]:
-                    status = determine_status(payment)
-                    
-                    processed_payments.append({
-                        'periode': f"{payment.get('bulan', '')} {payment.get('tahun', '')}",
-                        'nominal': f"Rp {int(payment.get('nominal', 0)):,}",
-                        'metode': payment.get('metode', 'Transfer Bank'),
-                        'status': status,
-                        'tanggal': payment.get('waktu', '').split()[0],
-                        'bukti': payment.get('bukti', '')
-                    })
+                    try:
+                        status = determine_payment_status(payment)
+                        
+                        processed_payments.append({
+                            'periode': f"{payment.get('bulan', '')} {payment.get('tahun', '')}",
+                            'nominal': f"Rp {int(payment.get('nominal', 0)):,}",
+                            'metode': payment.get('metode', 'Transfer Bank'),
+                            'status': status,
+                            'tanggal': payment.get('waktu', '').split()[0] if payment.get('waktu') else '-',
+                            'bukti': payment.get('bukti', '')
+                        })
+                    except Exception as e:
+                        print(f"Error processing payment: {e}")
+                        continue
 
                 # Buat tabel HTML
                 table_html = """
@@ -219,15 +230,15 @@ def show_dashboard(gsheet):
                     .payment-table tr:hover {
                         background-color: rgba(52, 152, 219, 0.1);
                     }
-                    .status-verified {
+                    .status-lunas {
                         color: #27ae60;
                         font-weight: 500;
                     }
-                    .status-pending {
+                    .status-menunggu {
                         color: #f39c12;
                         font-weight: 500;
                     }
-                    .status-unpaid {
+                    .status-belum {
                         color: #e74c3c;
                         font-weight: 500;
                     }
@@ -239,14 +250,8 @@ def show_dashboard(gsheet):
                     .payment-link:hover {
                         text-decoration: underline;
                     }
-                    .payment-table-container {
-                        max-height: 400px;
-                        overflow-y: auto;
-                        border: 1px solid #34495e;
-                        border-radius: 8px;
-                    }
                 </style>
-                <div class="payment-table-container">
+                <div class="table-responsive">
                 <table class="payment-table">
                     <thead>
                         <tr>
@@ -262,20 +267,26 @@ def show_dashboard(gsheet):
                 """
 
                 for payment in processed_payments:
-                    # Tentukan class status
+                    # Tentukan class dan ikon status
                     if 'Lunas' in payment['status'] or 'Diverifikasi' in payment['status']:
-                        status_class = "status-verified"
-                    elif 'Menunggu' in payment['status']:
-                        status_class = "status-pending"
+                        status_class = "status-lunas"
+                        status_icon = "check-circle"
+                    elif 'Menunggu' in payment['status'] or 'Belum Diverifikasi' in payment['status']:
+                        status_class = "status-menunggu"
+                        status_icon = "hourglass-half"
+                    elif 'Belum' in payment['status'] or 'Ditolak' in payment['status']:
+                        status_class = "status-belum"
+                        status_icon = "times-circle"
                     else:
-                        status_class = "status-unpaid"
+                        status_class = "status-menunggu"
+                        status_icon = "clock"
                     
                     # Format link bukti
                     bukti_link = f"""
                     <a href="{payment['bukti']}" target="_blank" class="payment-link">
                         <i class="fas fa-file-invoice"></i> Lihat
                     </a>
-                    """ if payment['bukti'] else "-"
+                    """ if payment.get('bukti') else "-"
 
                     table_html += f"""
                     <tr>
@@ -283,11 +294,7 @@ def show_dashboard(gsheet):
                         <td>{payment['nominal']}</td>
                         <td>{payment['metode']}</td>
                         <td class="{status_class}">
-                            <i class="fas fa-{
-                                'check-circle' if 'Lunas' in payment['status'] 
-                                else 'clock' if 'Menunggu' in payment['status'] 
-                                else 'times-circle'
-                            }"></i> {payment['status']}
+                            <i class="fas fa-{status_icon}"></i> {payment['status']}
                         </td>
                         <td>{payment['tanggal']}</td>
                         <td>{bukti_link}</td>
@@ -304,7 +311,7 @@ def show_dashboard(gsheet):
                 # Tambahkan catatan
                 st.markdown("""
                 <div style="margin-top: 10px; font-size: 14px; color: #95a5a6;">
-                    <i class="fas fa-info-circle"></i> Status pembayaran akan diperbarui oleh admin dalam 1x24 jam
+                    <i class="fas fa-info-circle"></i> Status akan diperbarui otomatis setelah admin memverifikasi pembayaran
                 </div>
                 """, unsafe_allow_html=True)
                 
