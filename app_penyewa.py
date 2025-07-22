@@ -247,6 +247,7 @@ def get_status_class(status):
 def show_pembayaran():
     USERNAME = st.session_state.get("username", "")
     st.title("💸 Pembayaran")
+
     sheet = connect_gsheet()
     ws = sheet.worksheet("Pembayaran")
     data = pd.DataFrame(ws.get_all_records())
@@ -254,7 +255,7 @@ def show_pembayaran():
         data = pd.DataFrame(columns=["username", "bukti", "bulan", "tahun", "waktu", "nominal", "status"])
     user_data = data[data['username'] == USERNAME]
 
-    # --- Custom CSS untuk card pembayaran ---
+    # --- Custom CSS untuk tab pembayaran ---
     st.markdown("""
     <style>
     .pay-card {
@@ -300,13 +301,57 @@ def show_pembayaran():
         max-width: 180px;
         max-height: 180px;
     }
+    .tab-menu {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 8px;
+        align-items: center;
+    }
+    .tab-item {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #E0E0E0;
+        cursor: pointer;
+        padding: 2px 8px;
+        border-radius: 6px;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .tab-item.active {
+        color: #FF5252;
+        border-bottom: 3px solid #FF5252;
+        background: rgba(255,82,82,0.08);
+    }
+    .tab-item:not(.active):hover {
+        background: rgba(66,165,245,0.08);
+        color: #42A5F5;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- Submenu Pembayaran ---
-    submenu = st.radio("Menu Pembayaran", ["Upload Bukti", "Riwayat Pembayaran"], horizontal=True)
+    # --- Tab menu pembayaran ---
+    if "pembayaran_tab" not in st.session_state:
+        st.session_state.pembayaran_tab = "Upload Bukti"
 
-    if submenu == "Upload Bukti":
+    tab_col1, tab_col2 = st.columns([1, 1])
+    with tab_col1:
+        if st.button("📄 Daftar Pembayaran", key="tab_riwayat"):
+            st.session_state.pembayaran_tab = "Riwayat Pembayaran"
+    with tab_col2:
+        if st.button("➕ Upload Bukti", key="tab_upload"):
+            st.session_state.pembayaran_tab = "Upload Bukti"
+
+    st.markdown(f"""
+    <div class="tab-menu">
+        <span class="tab-item {'active' if st.session_state.pembayaran_tab == 'Riwayat Pembayaran' else ''}">📄 Daftar Pembayaran</span>
+        <span class="tab-item {'active' if st.session_state.pembayaran_tab == 'Upload Bukti' else ''}">➕ Upload Bukti</span>
+    </div>
+    <hr style="border:1px solid #FF5252;margin-bottom:16px;">
+    """, unsafe_allow_html=True)
+
+    if st.session_state.pembayaran_tab == "Upload Bukti":
         st.subheader("Upload Bukti Pembayaran")
         with st.form("form_bayar"):
             bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
@@ -324,7 +369,7 @@ def show_pembayaran():
                     st.success("Bukti pembayaran berhasil dikirim!")
                     st.rerun()
 
-    elif submenu == "Riwayat Pembayaran":
+    elif st.session_state.pembayaran_tab == "Riwayat Pembayaran":
         st.subheader("Riwayat Pembayaran Saya")
         if not user_data.empty:
             sorted_user_data = user_data.sort_values("waktu", ascending=False)
