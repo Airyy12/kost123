@@ -303,59 +303,61 @@ def show_pembayaran():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- Form Input Pembayaran ---
-    st.subheader("Upload Bukti Pembayaran")
-    with st.form("form_bayar"):
-        bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
-        tahun = st.selectbox("Tahun", [datetime.now().year - 1, datetime.now().year, datetime.now().year + 1])
-        nominal = st.number_input("Nominal (Rp)", min_value=10000)
-        bukti = st.file_uploader("Upload Bukti Pembayaran", type=["jpg", "jpeg", "png"])
-        submit = st.form_submit_button("Kirim")
+    # --- Submenu Pembayaran ---
+    submenu = st.radio("Menu Pembayaran", ["Upload Bukti", "Riwayat Pembayaran"], horizontal=True)
 
-        if submit:
-            if not bukti:
-                st.warning("Mohon upload bukti pembayaran.")
-            else:
-                url = upload_to_cloudinary(bukti, f"bukti_{USERNAME}_{bulan}_{tahun}_{datetime.now().isoformat()}")
-                ws.append_row([USERNAME, url, bulan, tahun, datetime.now().isoformat(), nominal, "Menunggu Verifikasi"])
-                st.success("Bukti pembayaran berhasil dikirim!")
-                st.rerun()
+    if submenu == "Upload Bukti":
+        st.subheader("Upload Bukti Pembayaran")
+        with st.form("form_bayar"):
+            bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
+            tahun = st.selectbox("Tahun", [datetime.now().year - 1, datetime.now().year, datetime.now().year + 1])
+            nominal = st.number_input("Nominal (Rp)", min_value=10000)
+            bukti = st.file_uploader("Upload Bukti Pembayaran", type=["jpg", "jpeg", "png"])
+            submit = st.form_submit_button("Kirim")
 
-    # --- Riwayat Pembayaran dengan card style ---
-    st.markdown("---")
-    st.subheader("Riwayat Pembayaran Saya")
-    if not user_data.empty:
-        sorted_user_data = user_data.sort_values("waktu", ascending=False)
-        for i, (idx, row) in enumerate(sorted_user_data.iterrows()):
-            status_class = "status-lunas" if str(row['status']).lower() == "lunas" else \
-                           "status-ditolak" if str(row['status']).lower() == "ditolak" else \
-                           "status-belum" if "belum" in str(row['status']).lower() or "pending" in str(row['status']).lower() or "menunggu" in str(row['status']).lower() else \
-                           "status-default"
-            st.markdown(f"""
-            <div class="pay-card">
-                <div class="pay-title">🗓️ {row['bulan']} {row['tahun']}</div>
-                <div class="pay-row">
-                    <span class="pay-label">Nominal:</span> Rp{int(row['nominal']):,}
+            if submit:
+                if not bukti:
+                    st.warning("Mohon upload bukti pembayaran.")
+                else:
+                    url = upload_to_cloudinary(bukti, f"bukti_{USERNAME}_{bulan}_{tahun}_{datetime.now().isoformat()}")
+                    ws.append_row([USERNAME, url, bulan, tahun, datetime.now().isoformat(), nominal, "Menunggu Verifikasi"])
+                    st.success("Bukti pembayaran berhasil dikirim!")
+                    st.rerun()
+
+    elif submenu == "Riwayat Pembayaran":
+        st.subheader("Riwayat Pembayaran Saya")
+        if not user_data.empty:
+            sorted_user_data = user_data.sort_values("waktu", ascending=False)
+            for i, (idx, row) in enumerate(sorted_user_data.iterrows()):
+                status_class = "status-lunas" if str(row['status']).lower() == "lunas" else \
+                               "status-ditolak" if str(row['status']).lower() == "ditolak" else \
+                               "status-belum" if "belum" in str(row['status']).lower() or "pending" in str(row['status']).lower() or "menunggu" in str(row['status']).lower() else \
+                               "status-default"
+                st.markdown(f"""
+                <div class="pay-card">
+                    <div class="pay-title">🗓️ {row['bulan']} {row['tahun']}</div>
+                    <div class="pay-row">
+                        <span class="pay-label">Nominal:</span> Rp{int(row['nominal']):,}
+                    </div>
+                    <div class="pay-row">
+                        <span class="pay-label">Status:</span>
+                        <span class="pay-status-badge {status_class}">{row['status']}</span>
+                    </div>
+                    <div class="pay-row">
+                        <span class="pay-label">Waktu Upload:</span> {format_waktu(row['waktu'])}
+                    </div>
+                    {"<img src='" + row['bukti'] + "' class='pay-img'>" if row['bukti'] else ""}
+                    <div class="pay-row">
+                        <!-- Tombol hapus di luar HTML, gunakan key unik dari index asli DataFrame -->
+                    </div>
                 </div>
-                <div class="pay-row">
-                    <span class="pay-label">Status:</span>
-                    <span class="pay-status-badge {status_class}">{row['status']}</span>
-                </div>
-                <div class="pay-row">
-                    <span class="pay-label">Waktu Upload:</span> {format_waktu(row['waktu'])}
-                </div>
-                {"<img src='" + row['bukti'] + "' class='pay-img'>" if row['bukti'] else ""}
-                <div class="pay-row">
-                    <!-- Tombol hapus di luar HTML, gunakan key unik dari index asli DataFrame -->
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button(f"🗑️ Hapus Pembayaran", key=f"hapus_{idx}"):
-                ws.delete_rows(idx+2)  # header + index asli
-                st.success("Dihapus.")
-                st.rerun()
-    else:
-        st.info("Belum ada pembayaran.")
+                """, unsafe_allow_html=True)
+                if st.button(f"🗑️ Hapus Pembayaran", key=f"hapus_{idx}"):
+                    ws.delete_rows(idx+2)  # header + index asli
+                    st.success("Dihapus.")
+                    st.rerun()
+        else:
+            st.info("Belum ada pembayaran.")
 
 def show_komplain():
     USERNAME = st.session_state.get("username", "")
@@ -506,4 +508,3 @@ if __name__ == "__main__":
 
     # Jalankan fitur sesuai menu
     run_penyewa(menu)
- 
