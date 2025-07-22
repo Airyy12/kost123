@@ -24,8 +24,6 @@ def run_penyewa(menu):
 
 def show_dashboard():
     USERNAME = st.session_state.get("username", "")
-    st.markdown("<h1 style='text-align: center;'>👋 Selamat datang, {}</h1>".format(
-        st.session_state.get("nama", "Penyewa")), unsafe_allow_html=True)
     st.markdown("---")
 
     # Muat semua data yang dibutuhkan
