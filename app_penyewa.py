@@ -29,6 +29,13 @@ def format_waktu(waktu_str):
     except Exception:
         return waktu_str
 
+def bulan_indo(dt):
+    bulan_map = {
+        1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
+        7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober", 11: "November", 12: "Desember"
+    }
+    return bulan_map[dt.month]
+
 def show_dashboard():
     USERNAME = st.session_state.get("username", "")
     st.markdown("---")
@@ -61,49 +68,91 @@ def show_dashboard():
     data_pembayaran = pembayaran_df[pembayaran_df['username'] == username]
     pembayaran_terakhir = data_pembayaran.sort_values("waktu", ascending=False).head(1).to_dict("records")
     data_komplain = komplain_df[komplain_df['username'] == username]
-    riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(2)
 
-    # Statistik
-    total_kamar = len(kamar_df)
-    kamar_kosong = len(kamar_df[kamar_df['Status'] == 'Kosong'])
-    kamar_terisi = len(kamar_df[kamar_df['Status'] == 'Terisi'])
-    status_pembayaran = data_user.get('status_pembayaran', '-')
+    # --- Hitung status pembayaran 3 bulan ---
+    now = datetime.now()
+    bulan_sekarang = bulan_indo(now)
+    tahun_sekarang = now.year
+    bulan_sebelumnya = bulan_indo((now.replace(day=1) - timedelta(days=1)))
+    tahun_sebelumnya = (now.replace(day=1) - timedelta(days=1)).year
+    bulan_nanti = bulan_indo((now.replace(day=28) + timedelta(days=4)).replace(day=1))
+    tahun_nanti = (now.replace(day=28) + timedelta(days=4)).replace(day=1).year
 
-    # Custom CSS (ubah warna card agar sama dengan admin)
+    def get_status(bulan, tahun):
+        df = data_pembayaran[(data_pembayaran['bulan'] == bulan) & (data_pembayaran['tahun'] == tahun)]
+        if not df.empty:
+            return df.iloc[0]['status']
+        return "-"
+
+    status_sebelumnya = get_status(bulan_sebelumnya, tahun_sebelumnya)
+    status_sekarang = get_status(bulan_sekarang, tahun_sekarang)
+    status_nanti = get_status(bulan_nanti, tahun_nanti)
+    nominal_perbulan = int(data_kamar['Harga']) if 'Harga' in data_kamar else 0
+
+    # --- Komplain statistik ---
+    jumlah_selesai = len(data_komplain[data_komplain['status'].str.lower() == 'selesai']) if not data_komplain.empty else 0
+    jumlah_pending = len(data_komplain[data_komplain['status'].str.lower().str.contains('pending|belum')]) if not data_komplain.empty else 0
+    jumlah_ditolak = len(data_komplain[data_komplain['status'].str.lower() == 'ditolak']) if not data_komplain.empty else 0
+    komplain_terakhir = data_komplain.sort_values("waktu", ascending=False).head(1)
+    isi_komplain_terakhir = komplain_terakhir.iloc[0]['isi_komplain'] if not komplain_terakhir.empty else "-"
+
+    # --- Custom CSS ---
     st.markdown("""
     <style>
-    .info-card {
+    .dashboard-card {
         background: rgba(60,60,60,0.7);
-        padding: 18px;
+        padding: 20px;
         border-radius: 12px;
-        margin-bottom: 18px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        text-align: center;
+        color: #E0E0E0;
+        margin-bottom: 18px;
     }
-    .card-title {
-        font-size: 18px;
+    .dashboard-label {
         font-weight: bold;
-        margin-bottom: 8px;
+        color: #E0E0E0;
+        margin-bottom: 6px;
+    }
+    .dashboard-value {
+        margin-bottom: 10px;
         color: #E0E0E0;
     }
-    .card-content {
-        color: #E0E0E0;
-        font-size: 16px;
-        margin-bottom: 4px;
+    .dashboard-section-title {
+        font-size: 1.1rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: #42A5F5;
     }
-    .card-time {
-        font-size: 14px;
-        color: #B0B0B0;
-        margin-bottom: 5px;
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 0.95em;
+        margin-right: 8px;
     }
-    .komplain-card, .pembayaran-card {
-        background: rgba(60,60,60,0.7);
-        padding: 15px;
-        border-radius: 12px;
-        margin-bottom: 15px;
-        border-left: 5px solid #42A5F5;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        color: #E0E0E0;
+    .status-lunas { background: #66BB6A; color: #fff; }
+    .status-belum { background: #FFA726; color: #222; }
+    .status-ditolak { background: #EF5350; color: #fff; }
+    .status-default { background: #888; color: #fff; }
+    .info-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 12px;
+    }
+    .info-icon {
+        font-size: 1.5em;
+        margin-right: 10px;
+    }
+    .komplain-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 12px;
+    }
+    .komplain-icon {
+        font-size: 1.5em;
+        margin-right: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -111,65 +160,89 @@ def show_dashboard():
     st.markdown(f"<h1 style='text-align:center;'>👋 Selamat datang, {data_user['nama_lengkap']}</h1>", unsafe_allow_html=True)
     st.markdown("---")
 
+    # --- Layout utama: 2 kolom ---
+    col_left, col_right = st.columns([1,2])
 
-    # Layout 3 kolom: Profil, Komplain, Pembayaran
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("### 👤 Profil Saya")
-        st.markdown(f"""
-        <div class="info-card">
-            <img src="{data_user['foto_profil'] if data_user['foto_profil'] else 'https://via.placeholder.com/150'}" width="120" style="border-radius:8px;margin-bottom:10px;">
-            <div class="card-title">{data_user['nama_lengkap']}</div>
-            <div class="card-content">No HP: {data_user['no_hp']}</div>
-            <div class="card-content">Kamar: {data_user['kamar']}</div>
-            <div class="card-content">Deskripsi: {data_user['deskripsi']}</div>
-            <div class="card-content">Terakhir Edit: {format_waktu(data_user['last_edit'])}</div>
+    with col_left:
+        st.markdown("""
+        <div class="dashboard-card">
+            <img src="{foto}" width="120" style="border-radius:8px;margin-bottom:10px;">
+            <div class="dashboard-label">Nama</div>
+            <div class="dashboard-value">{nama}</div>
+            <div class="dashboard-label">Username</div>
+            <div class="dashboard-value">{username}</div>
+            <div class="dashboard-label">Kamar</div>
+            <div class="dashboard-value">{kamar}</div>
+            <div class="dashboard-label">Deskripsi</div>
+            <div class="dashboard-value">{deskripsi}</div>
         </div>
-        """, unsafe_allow_html=True)
-        st.markdown("### 🛏️ Info Kamar")
+        """.format(
+            foto=data_user['foto_profil'] if data_user['foto_profil'] else 'https://via.placeholder.com/150',
+            nama=data_user['nama_lengkap'],
+            username=data_user['username'],
+            kamar=data_user['kamar'],
+            deskripsi=data_user['deskripsi']
+        ), unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown('<div class="dashboard-section-title">Info Pembayaran</div>', unsafe_allow_html=True)
         st.markdown(f"""
-        <div class="info-card">
-            <img src="{data_kamar['link_foto'] if data_kamar['link_foto'] else 'https://via.placeholder.com/150'}" width="120" style="border-radius:8px;margin-bottom:10px;">
-            <div class="card-title">{data_kamar['Nama']}</div>
-            <div class="card-content">Status: {data_kamar['Status']}</div>
-            <div class="card-content">Harga: Rp{int(data_kamar['Harga']):,}/bulan</div>
-            <div class="card-content">{data_kamar['Deskripsi']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("### 💬 Komplain Terbaru")
-        if riwayat_komplain.empty:
-            st.info("Belum ada komplain.")
-        else:
-            for _, row in riwayat_komplain.iterrows():
-                st.markdown(f"""
-                <div class="komplain-card">
-                    <div class="card-title">📅 {format_waktu(row['waktu'])}</div>
-                    <div class="card-content">{row['isi_komplain']}</div>
-                    <div class="card-content">Status: {row['status']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-    with col3:
-        st.markdown("### 💳 Pembayaran Terakhir")
-        if pembayaran_terakhir:
-            p = pembayaran_terakhir[0]
-            st.markdown(f"""
-            <div class="pembayaran-card">
-                <img src="{p['bukti'] if p['bukti'] else 'https://via.placeholder.com/150'}" width="120" style="border-radius:8px;margin-bottom:10px;">
-                <div class="card-title">{p['bulan']} {p['tahun']}</div>
-                <div class="card-content">Nominal: Rp{int(p['nominal']):,}</div>
-                <div class="card-content">Status: {p['status']}</div>
-                <div class="card-content">Waktu: {format_waktu(p['waktu'])}</div>
+        <div class="dashboard-card">
+            <div class="dashboard-label">Nominal Perbulan</div>
+            <div class="dashboard-value">Rp{nominal_perbulan:,}</div>
+            <div class="info-row">
+                <span class="info-icon">🗓️</span>
+                <b>{bulan_sebelumnya} {tahun_sebelumnya}</b>
+                <span class="status-badge {get_status_class(status_sebelumnya)}">{status_sebelumnya}</span>
             </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("Belum ada pembayaran tercatat.")
+            <div class="info-row">
+                <span class="info-icon">🗓️</span>
+                <b>{bulan_sekarang} {tahun_sekarang}</b>
+                <span class="status-badge {get_status_class(status_sekarang)}">{status_sekarang}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-icon">🗓️</span>
+                <b>{bulan_nanti} {tahun_nanti}</b>
+                <span class="status-badge {get_status_class(status_nanti)}">{status_nanti}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="dashboard-section-title">Info Komplain</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="dashboard-card">
+            <div class="komplain-row">
+                <span class="komplain-icon">✅</span>
+                <b>Selesai:</b> {jumlah_selesai}
+            </div>
+            <div class="komplain-row">
+                <span class="komplain-icon">⏳</span>
+                <b>Pending:</b> {jumlah_pending}
+            </div>
+            <div class="komplain-row">
+                <span class="komplain-icon">❌</span>
+                <b>Ditolak:</b> {jumlah_ditolak}
+            </div>
+            <div class="komplain-row">
+                <span class="komplain-icon">📝</span>
+                <b>Komplain terakhir:</b> {isi_komplain_terakhir}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
 
+# Tambahkan fungsi utilitas untuk badge status
+def get_status_class(status):
+    status = str(status).lower()
+    if status == "lunas":
+        return "status-lunas"
+    elif "belum" in status or "pending" in status or "menunggu" in status:
+        return "status-belum"
+    elif status == "ditolak":
+        return "status-ditolak"
+    else:
+        return "status-default"
 
 def show_pembayaran():
     USERNAME = st.session_state.get("username", "")
