@@ -282,7 +282,7 @@ def show_dashboard():
                 else:
                     st.info("Belum ada data pembayaran.")
             else:
-                st.info("Kolom 'username' belum tersedia di sheet Pembayaran.")
+                st.info("Belum Ada komplain yang kamu kirim.")
 
 def run_penyewa(menu):
     if menu == "Dashboard":
