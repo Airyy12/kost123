@@ -160,6 +160,21 @@ def show_dashboard():
     kamar_df = load_sheet_data("Kamar")
     pembayaran_df = load_sheet_data("Pembayaran")
     komplain_df = load_sheet_data("Komplain")
+    # --- Fix: handle missing or different username column in Komplain sheet ---
+    komplain_username_col = None
+    for col in komplain_df.columns:
+        if col.lower() == "username":
+            komplain_username_col = col
+            break
+    if not komplain_username_col:
+        # Try to guess possible username column
+        for col in komplain_df.columns:
+            if "user" in col.lower():
+                komplain_username_col = col
+                break
+    if not komplain_username_col:
+        st.markdown("<div class='warning-box'>Data komplain tidak memiliki kolom username. Silakan hubungi admin.</div>", unsafe_allow_html=True)
+        return
 
     # Ambil data penyewa saat ini
     username = st.session_state.get("username", "")
@@ -177,7 +192,7 @@ def show_dashboard():
 
     data_pembayaran = pembayaran_df[pembayaran_df['username'] == username]
     pembayaran_terakhir = data_pembayaran.sort_values("waktu", ascending=False).head(1).to_dict("records")
-    data_komplain = komplain_df[komplain_df['username'] == username]
+    data_komplain = komplain_df[komplain_df[komplain_username_col] == username]
     riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(5)
 
     # --- Modern horizontal info cards ---
