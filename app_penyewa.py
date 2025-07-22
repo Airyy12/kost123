@@ -22,6 +22,13 @@ def run_penyewa(menu):
         st.session_state.menu = None
         st.rerun()
 
+def format_waktu(waktu_str):
+    try:
+        dt = datetime.fromisoformat(waktu_str)
+        return dt.strftime("%d %B %Y %H:%M")
+    except Exception:
+        return waktu_str
+
 def show_dashboard():
     USERNAME = st.session_state.get("username", "")
     st.markdown("---")
@@ -62,11 +69,11 @@ def show_dashboard():
     kamar_terisi = len(kamar_df[kamar_df['Status'] == 'Terisi'])
     status_pembayaran = data_user.get('status_pembayaran', '-')
 
-    # Custom CSS
+    # Custom CSS (ubah warna card agar sama dengan admin)
     st.markdown("""
     <style>
     .info-card {
-        background: #fff;
+        background: rgba(60,60,60,0.7);
         padding: 18px;
         border-radius: 12px;
         margin-bottom: 18px;
@@ -77,25 +84,26 @@ def show_dashboard():
         font-size: 18px;
         font-weight: bold;
         margin-bottom: 8px;
-        color: #2c3e50;
+        color: #E0E0E0;
     }
     .card-content {
-        color: #444;
+        color: #E0E0E0;
         font-size: 16px;
         margin-bottom: 4px;
     }
     .card-time {
         font-size: 14px;
-        color: #888;
+        color: #B0B0B0;
         margin-bottom: 5px;
     }
     .komplain-card, .pembayaran-card {
-        background: #f7f7fa;
+        background: rgba(60,60,60,0.7);
         padding: 15px;
         border-radius: 12px;
         margin-bottom: 15px;
         border-left: 5px solid #42A5F5;
         box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        color: #E0E0E0;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -103,38 +111,6 @@ def show_dashboard():
     st.markdown(f"<h1 style='text-align:center;'>👋 Selamat datang, {data_user['nama_lengkap']}</h1>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # Statistik Kamar & Status
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f"""
-        <div class="info-card">
-            <div class="card-title">🏘️ Total Kamar</div>
-            <div class="card-content">{total_kamar}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div class="info-card">
-            <div class="card-title">🛏️ Kamar Kosong</div>
-            <div class="card-content">{kamar_kosong}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""
-        <div class="info-card">
-            <div class="card-title">🧑 Kamar Terisi</div>
-            <div class="card-content">{kamar_terisi}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col4:
-        st.markdown(f"""
-        <div class="info-card">
-            <div class="card-title">💳 Status Pembayaran</div>
-            <div class="card-content">{status_pembayaran}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("---")
 
     # Layout 3 kolom: Profil, Komplain, Pembayaran
     col1, col2, col3 = st.columns(3)
@@ -148,7 +124,7 @@ def show_dashboard():
             <div class="card-content">No HP: {data_user['no_hp']}</div>
             <div class="card-content">Kamar: {data_user['kamar']}</div>
             <div class="card-content">Deskripsi: {data_user['deskripsi']}</div>
-            <div class="card-content">Terakhir Edit: {data_user['last_edit']}</div>
+            <div class="card-content">Terakhir Edit: {format_waktu(data_user['last_edit'])}</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("### 🛏️ Info Kamar")
@@ -170,7 +146,7 @@ def show_dashboard():
             for _, row in riwayat_komplain.iterrows():
                 st.markdown(f"""
                 <div class="komplain-card">
-                    <div class="card-title">📅 {row['waktu']}</div>
+                    <div class="card-title">📅 {format_waktu(row['waktu'])}</div>
                     <div class="card-content">{row['isi_komplain']}</div>
                     <div class="card-content">Status: {row['status']}</div>
                 </div>
@@ -186,7 +162,7 @@ def show_dashboard():
                 <div class="card-title">{p['bulan']} {p['tahun']}</div>
                 <div class="card-content">Nominal: Rp{int(p['nominal']):,}</div>
                 <div class="card-content">Status: {p['status']}</div>
-                <div class="card-content">Waktu: {p['waktu']}</div>
+                <div class="card-content">Waktu: {format_waktu(p['waktu'])}</div>
             </div>
             """, unsafe_allow_html=True)
         else:
@@ -231,7 +207,7 @@ def show_pembayaran():
             with st.expander(f"{row['bulan']} {row['tahun']} - Rp {row['nominal']:,} [{row['status']}]"):
                 if row['bukti']:
                     st.image(row['bukti'], width=300)
-                st.markdown(f"- Waktu: `{row['waktu']}`")
+                st.markdown(f"- Waktu: `{format_waktu(row['waktu'])}`")
                 if st.button(f"Hapus Pembayaran {i}", key=f"hapus_{i}"):
                     ws.delete_rows(i+2)  # header + index
                     st.success("Dihapus.")
@@ -270,7 +246,7 @@ def show_komplain():
     st.subheader("Riwayat Komplain Saya")
     if not user_data.empty:
         for i, row in user_data.iterrows():
-            with st.expander(f"{row['waktu']} - {row['status']}"):
+            with st.expander(f"{format_waktu(row['waktu'])} - {row['status']}"):
                 st.markdown(row['isi_komplain'])
                 if row['link_foto']:
                     st.image(row['link_foto'], width=300)
@@ -294,7 +270,7 @@ def show_profil():
     row = data.iloc[idx]
 
     st.image(row['foto_profil'], width=150)
-    st.markdown(f"**Terakhir Edit:** {row['last_edit']}")
+    st.markdown(f"**Terakhir Edit:** {format_waktu(row['last_edit'])}")
 
     edit_allowed = True
     try:
@@ -356,4 +332,35 @@ if __name__ == "__main__":
 
     # Jalankan fitur sesuai menu
     run_penyewa(menu)
-    
+    # Inisialisasi session state jika belum ada
+    if "login_status" not in st.session_state:
+        st.session_state.login_status = True
+    if "username" not in st.session_state:
+        st.session_state.username = ""
+    if "role" not in st.session_state:
+        st.session_state.role = "penyewa"
+    if "menu" not in st.session_state:
+        st.session_state.menu = "Dashboard"
+
+    # Simulasi login sederhana
+    if not st.session_state.login_status or not st.session_state.username:
+        st.title("Login Penyewa")
+        username_input = st.text_input("Username")
+        if st.button("Login"):
+            st.session_state.username = username_input
+            st.session_state.login_status = True
+            st.session_state.role = "penyewa"
+            st.session_state.menu = "Dashboard"
+            st.rerun()
+        st.stop()
+
+    # Sidebar Menu Navigasi
+    menu = st.sidebar.radio(
+        "Menu Penyewa",
+        ["Dashboard", "Pembayaran", "Komplain", "Profil Saya", "Logout"],
+        index=["Dashboard", "Pembayaran", "Komplain", "Profil Saya", "Logout"].index(st.session_state.menu)
+    )
+    st.session_state.menu = menu
+
+    # Jalankan fitur sesuai menu
+    run_penyewa(menu)
