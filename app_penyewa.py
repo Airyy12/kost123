@@ -254,6 +254,55 @@ def show_pembayaran():
         data = pd.DataFrame(columns=["username", "bukti", "bulan", "tahun", "waktu", "nominal", "status"])
     user_data = data[data['username'] == USERNAME]
 
+    # --- Custom CSS untuk card pembayaran ---
+    st.markdown("""
+    <style>
+    .pay-card {
+        background: rgba(60,60,60,0.7);
+        padding: 18px;
+        border-radius: 12px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        color: #E0E0E0;
+    }
+    .pay-title {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #42A5F5;
+        margin-bottom: 8px;
+    }
+    .pay-row {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 10px;
+    }
+    .pay-label {
+        font-weight: bold;
+        color: #E0E0E0;
+        margin-right: 8px;
+    }
+    .pay-status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 0.95em;
+        margin-right: 8px;
+    }
+    .status-lunas { background: #66BB6A; color: #fff; }
+    .status-belum { background: #EF5350; color: #fff; }
+    .status-ditolak { background: #FFA726; color: #222; }
+    .status-default { background: #888; color: #fff; }
+    .pay-img {
+        border-radius: 8px;
+        margin-bottom: 8px;
+        max-width: 180px;
+        max-height: 180px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # --- Form Input Pembayaran ---
     st.subheader("Upload Bukti Pembayaran")
     with st.form("form_bayar"):
@@ -272,19 +321,39 @@ def show_pembayaran():
                 st.success("Bukti pembayaran berhasil dikirim!")
                 st.rerun()
 
-    # --- Riwayat Pembayaran ---
+    # --- Riwayat Pembayaran dengan card style ---
     st.markdown("---")
     st.subheader("Riwayat Pembayaran Saya")
     if not user_data.empty:
-        for i, row in user_data.iterrows():
-            with st.expander(f"{row['bulan']} {row['tahun']} - Rp {row['nominal']:,} [{row['status']}]"):
-                if row['bukti']:
-                    st.image(row['bukti'], width=300)
-                st.markdown(f"- Waktu: `{format_waktu(row['waktu'])}`")
-                if st.button(f"Hapus Pembayaran {i}", key=f"hapus_{i}"):
-                    ws.delete_rows(i+2)  # header + index
-                    st.success("Dihapus.")
-                    st.rerun()
+        sorted_user_data = user_data.sort_values("waktu", ascending=False)
+        for i, (idx, row) in enumerate(sorted_user_data.iterrows()):
+            status_class = "status-lunas" if str(row['status']).lower() == "lunas" else \
+                           "status-ditolak" if str(row['status']).lower() == "ditolak" else \
+                           "status-belum" if "belum" in str(row['status']).lower() or "pending" in str(row['status']).lower() or "menunggu" in str(row['status']).lower() else \
+                           "status-default"
+            st.markdown(f"""
+            <div class="pay-card">
+                <div class="pay-title">🗓️ {row['bulan']} {row['tahun']}</div>
+                <div class="pay-row">
+                    <span class="pay-label">Nominal:</span> Rp{int(row['nominal']):,}
+                </div>
+                <div class="pay-row">
+                    <span class="pay-label">Status:</span>
+                    <span class="pay-status-badge {status_class}">{row['status']}</span>
+                </div>
+                <div class="pay-row">
+                    <span class="pay-label">Waktu Upload:</span> {format_waktu(row['waktu'])}
+                </div>
+                {"<img src='" + row['bukti'] + "' class='pay-img'>" if row['bukti'] else ""}
+                <div class="pay-row">
+                    <!-- Tombol hapus di luar HTML, gunakan key unik dari index asli DataFrame -->
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"🗑️ Hapus Pembayaran", key=f"hapus_{idx}"):
+                ws.delete_rows(idx+2)  # header + index asli
+                st.success("Dihapus.")
+                st.rerun()
     else:
         st.info("Belum ada pembayaran.")
 
