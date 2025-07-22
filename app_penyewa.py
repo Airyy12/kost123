@@ -248,6 +248,7 @@ def show_pembayaran():
     USERNAME = st.session_state.get("username", "")
     st.title("💸 Pembayaran")
 
+    # Load data
     sheet = connect_gsheet()
     ws = sheet.worksheet("Pembayaran")
     data = pd.DataFrame(ws.get_all_records())
@@ -255,237 +256,500 @@ def show_pembayaran():
         data = pd.DataFrame(columns=["username", "bukti", "bulan", "tahun", "waktu", "nominal", "status"])
     user_data = data[data['username'] == USERNAME]
 
-    # --- Custom CSS untuk tab pembayaran ---
+    # Custom CSS
     st.markdown("""
     <style>
-    .pay-card {
-        background: rgba(60,60,60,0.7);
-        padding: 18px;
-        border-radius: 12px;
-        margin-bottom: 18px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        color: #E0E0E0;
+    .payment-container {
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: rgba(30, 30, 30, 0.7);
+        border-left: 4px solid #42A5F5;
     }
-    .pay-title {
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: #42A5F5;
-        margin-bottom: 8px;
-    }
-    .pay-row {
+    .payment-header {
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 18px;
-        margin-bottom: 10px;
-    }
-    .pay-label {
-        font-weight: bold;
-        color: #E0E0E0;
-        margin-right: 8px;
-    }
-    .pay-status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 8px;
-        font-weight: bold;
-        font-size: 0.95em;
-        margin-right: 8px;
-    }
-    .status-lunas { background: #66BB6A; color: #fff; }
-    .status-belum { background: #EF5350; color: #fff; }
-    .status-ditolak { background: #FFA726; color: #222; }
-    .status-default { background: #888; color: #fff; }
-    .pay-img {
-        border-radius: 8px;
-        margin-bottom: 8px;
-        max-width: 180px;
-        max-height: 180px;
-    }
-    .tab-menu {
-        display: flex;
-        gap: 24px;
-        margin-bottom: 8px;
-        align-items: center;
-    }
-    .tab-item {
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: #E0E0E0;
         cursor: pointer;
-        padding: 2px 8px;
-        border-radius: 6px;
-        transition: background 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        padding: 0.5rem 0;
     }
-    .tab-item.active {
-        color: #FF5252;
-        border-bottom: 3px solid #FF5252;
-        background: rgba(255,82,82,0.08);
-    }
-    .tab-item:not(.active):hover {
-        background: rgba(66,165,245,0.08);
+    .payment-title {
+        font-size: 1rem;
+        font-weight: bold;
         color: #42A5F5;
+        margin: 0;
+    }
+    .payment-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+    .status-lunas { background: #4CAF50; color: white; }
+    .status-pending { background: #FF9800; color: black; }
+    .status-ditolak { background: #F44336; color: white; }
+    .payment-content {
+        padding: 1rem 0;
+        border-top: 1px solid #444;
+        margin-top: 0.5rem;
+    }
+    .payment-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .payment-label {
+        font-size: 0.85rem;
+        color: #9E9E9E;
+        margin-bottom: 0.25rem;
+    }
+    .payment-value {
+        font-size: 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- Tab menu pembayaran ---
-    if "pembayaran_tab" not in st.session_state:
-        st.session_state.pembayaran_tab = "Upload Bukti"
+    # Tab navigation
+    tab1, tab2 = st.tabs(["📋 Riwayat Pembayaran", "💳 Upload Pembayaran"])
 
-    tab_col1, tab_col2 = st.columns([1, 1])
-    with tab_col1:
-        if st.button("📄 Daftar Pembayaran", key="tab_riwayat"):
-            st.session_state.pembayaran_tab = "Riwayat Pembayaran"
-    with tab_col2:
-        if st.button("➕ Upload Bukti", key="tab_upload"):
-            st.session_state.pembayaran_tab = "Upload Bukti"
-
-    st.markdown(f"""
-    <div class="tab-menu">
-        <span class="tab-item {'active' if st.session_state.pembayaran_tab == 'Riwayat Pembayaran' else ''}">📄 Daftar Pembayaran</span>
-        <span class="tab-item {'active' if st.session_state.pembayaran_tab == 'Upload Bukti' else ''}">➕ Upload Bukti</span>
-    </div>
-    <hr style="border:1px solid #FF5252;margin-bottom:16px;">
-    """, unsafe_allow_html=True)
-
-    if st.session_state.pembayaran_tab == "Upload Bukti":
-        st.subheader("Upload Bukti Pembayaran")
-        with st.form("form_bayar"):
-            bulan = st.selectbox("Bulan", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
-            tahun = st.selectbox("Tahun", [datetime.now().year - 1, datetime.now().year, datetime.now().year + 1])
-            nominal = st.number_input("Nominal (Rp)", min_value=10000)
-            bukti = st.file_uploader("Upload Bukti Pembayaran", type=["jpg", "jpeg", "png"])
-            submit = st.form_submit_button("Kirim")
-
-            if submit:
-                if not bukti:
-                    st.warning("Mohon upload bukti pembayaran.")
-                else:
-                    url = upload_to_cloudinary(bukti, f"bukti_{USERNAME}_{bulan}_{tahun}_{datetime.now().isoformat()}")
-                    ws.append_row([USERNAME, url, bulan, tahun, datetime.now().isoformat(), nominal, "Menunggu Verifikasi"])
-                    st.success("Bukti pembayaran berhasil dikirim!")
-                    st.rerun()
-
-    elif st.session_state.pembayaran_tab == "Riwayat Pembayaran":
-        st.subheader("Riwayat Pembayaran Saya")
-        if not user_data.empty:
-            sorted_user_data = user_data.sort_values("waktu", ascending=False)
-            for i, (idx, row) in enumerate(sorted_user_data.iterrows()):
-                status_class = "status-lunas" if str(row['status']).lower() == "lunas" else \
-                               "status-ditolak" if str(row['status']).lower() == "ditolak" else \
-                               "status-belum" if "belum" in str(row['status']).lower() or "pending" in str(row['status']).lower() or "menunggu" in str(row['status']).lower() else \
-                               "status-default"
-                st.markdown(f"""
-                <div class="pay-card">
-                    <div class="pay-title">🗓️ {row['bulan']} {row['tahun']}</div>
-                    <div class="pay-row">
-                        <span class="pay-label">Nominal:</span> Rp{int(row['nominal']):,}
-                    </div>
-                    <div class="pay-row">
-                        <span class="pay-label">Status:</span>
-                        <span class="pay-status-badge {status_class}">{row['status']}</span>
-                    </div>
-                    <div class="pay-row">
-                        <span class="pay-label">Waktu Upload:</span> {format_waktu(row['waktu'])}
-                    </div>
-                    {"<img src='" + row['bukti'] + "' class='pay-img'>" if row['bukti'] else ""}
-                    <div class="pay-row">
-                        <!-- Tombol hapus di luar HTML, gunakan key unik dari index asli DataFrame -->
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button(f"🗑️ Hapus Pembayaran", key=f"hapus_{idx}"):
-                    ws.delete_rows(idx+2)  # header + index asli
-                    st.success("Dihapus.")
-                    st.rerun()
+    with tab1:
+        if user_data.empty:
+            st.info("Belum ada riwayat pembayaran")
         else:
-            st.info("Belum ada pembayaran.")
+            # Sort by date descending
+            sorted_data = user_data.sort_values(["tahun", "bulan"], ascending=[False, False])
+            
+            for idx, payment in sorted_data.iterrows():
+                # Status styling
+                status = payment['status'].lower()
+                status_class = "status-lunas" if status == "lunas" else \
+                             "status-ditolak" if status in ["ditolak", "rejected"] else \
+                             "status-pending"
+                
+                # Create expandable section
+                with st.expander(f"{payment['bulan']} {payment['tahun']}", expanded=False):
+                    st.markdown('<div class="payment-container">', unsafe_allow_html=True)
+                    
+                    # Header with status
+                    st.markdown(
+                        f'<div class="payment-header">'
+                        f'<div class="payment-status {status_class}">{payment["status"]}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    
+                    # Payment details
+                    st.markdown('<div class="payment-content">', unsafe_allow_html=True)
+                    st.markdown('<div class="payment-grid">', unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown('<div class="payment-label">Nominal</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="payment-value">Rp {int(payment["nominal"]):,}</div>', unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown('<div class="payment-label">Tanggal Upload</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="payment-value">{format_waktu(payment["waktu"])}</div>', unsafe_allow_html=True)
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Payment proof
+                    if payment['bukti']:
+                        st.image(payment['bukti'], use_container_width=True)
+                    else:
+                        st.markdown("_Tidak ada bukti pembayaran_")
+                    
+                    # Delete button
+                    if st.button(f"Hapus Pembayaran", key=f"delete_{idx}"):
+                        ws.delete_rows(idx+2)
+                        st.success("Pembayaran berhasil dihapus!")
+                        st.rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab2:
+        # Initialize form
+        with st.form(key='payment_form', clear_on_submit=True):
+            st.subheader("Form Pembayaran")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                bulan = st.selectbox(
+                    "Bulan",
+                    ["Januari", "Februari", "Maret", "April", "Mei", "Juni", 
+                     "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
+                    index=datetime.now().month-1
+                )
+            with col2:
+                tahun = st.selectbox(
+                    "Tahun",
+                    [datetime.now().year-1, datetime.now().year, datetime.now().year+1],
+                    index=1
+                )
+            
+            nominal = st.number_input(
+                "Nominal Pembayaran (Rp)",
+                min_value=100000,
+                value=1500000,
+                step=50000
+            )
+            
+            bukti = st.file_uploader(
+                "Upload Bukti Pembayaran",
+                type=["jpg", "jpeg", "png"],
+                help="Upload bukti transfer atau pembayaran"
+            )
+            
+            # Proper submit button
+            submitted = st.form_submit_button("Kirim Pembayaran")
+            
+            if submitted:
+                if not bukti:
+                    st.error("Harap upload bukti pembayaran")
+                else:
+                    try:
+                        image_url = upload_to_cloudinary(
+                            bukti, 
+                            f"payment_{USERNAME}_{bulan}_{tahun}_{datetime.now().timestamp()}"
+                        )
+                        
+                        ws.append_row([
+                            USERNAME,
+                            image_url,
+                            bulan,
+                            tahun,
+                            datetime.now().isoformat(),
+                            nominal,
+                            "Menunggu Verifikasi"
+                        ])
+                        
+                        st.success("Bukti pembayaran berhasil dikirim!")
+                        # Form will auto-clear because of clear_on_submit=True
+                    except Exception as e:
+                        st.error(f"Gagal mengupload: {str(e)}")
 
 def show_komplain():
     USERNAME = st.session_state.get("username", "")
     st.title("📢 Komplain")
+    
+    # Load data
     sheet = connect_gsheet()
     ws = sheet.worksheet("Komplain")
     data = pd.DataFrame(ws.get_all_records())
     if data.empty:
-        data = pd.DataFrame(columns=["username", "isi_komplain", "link_foto", "waktu", "status"])
+        data = pd.DataFrame(columns=["username", "isi_komplain", "link_foto", "waktu", "status", "tanggapan"])
     user_data = data[data['username'] == USERNAME]
 
-    # --- Form Input Komplain ---
-    st.subheader("Kirim Komplain Baru")
-    with st.form("form_komplain"):
-        isi = st.text_area("Isi Komplain")
-        foto = st.file_uploader("Upload Foto (Opsional)", type=["jpg", "jpeg", "png"])
-        submit = st.form_submit_button("Kirim Komplain")
+    # Custom CSS
+    st.markdown("""
+    <style>
+    .complaint-container {
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: rgba(30, 30, 30, 0.7);
+        border-left: 4px solid #FF5252;
+    }
+    .complaint-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        padding: 0.5rem 0;
+    }
+    .complaint-title {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #FF5252;
+        margin: 0;
+    }
+    .complaint-status {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+    .status-selesai { background: #4CAF50; color: white; }
+    .status-pending { background: #FF9800; color: black; }
+    .status-ditolak { background: #F44336; color: white; }
+    .status-terkirim { background: #2196F3; color: white; }
+    .complaint-content {
+        padding: 1rem 0;
+        border-top: 1px solid #444;
+        margin-top: 0.5rem;
+    }
+    .complaint-text {
+        margin-bottom: 1rem;
+        white-space: pre-line;
+    }
+    .response-container {
+        background: rgba(60, 60, 60, 0.5);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+        border-left: 3px solid #42A5F5;
+    }
+    .response-label {
+        font-weight: bold;
+        color: #42A5F5;
+        margin-bottom: 0.5rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-        if submit:
-            if not isi:
-                st.warning("Mohon isi komplain terlebih dahulu.")
-            else:
-                url = upload_to_cloudinary(foto, f"komplain_{USERNAME}_{datetime.now().isoformat()}") if foto else ""
-                ws.append_row([USERNAME, isi, url, datetime.now().isoformat(), "Terkirim"])
-                st.success("Komplain berhasil dikirim!")
-                st.rerun()
+    # Tab navigation
+    tab1, tab2 = st.tabs(["📋 Riwayat Komplain", "📝 Buat Komplain Baru"])
 
-    # --- Riwayat Komplain ---
-    st.markdown("---")
-    st.subheader("Riwayat Komplain Saya")
-    if not user_data.empty:
-        for i, row in user_data.iterrows():
-            with st.expander(f"{format_waktu(row['waktu'])} - {row['status']}"):
-                st.markdown(row['isi_komplain'])
-                if row['link_foto']:
-                    st.image(row['link_foto'], width=300)
-                if st.button(f"Hapus Komplain {i}", key=f"hapus_komplain_{i}"):
-                    ws.delete_rows(i+2)
-                    st.success("Komplain dihapus.")
-                    st.rerun()
-    else:
-        st.info("Belum ada komplain.")
+    with tab1:
+        if user_data.empty:
+            st.info("Belum ada riwayat komplain")
+        else:
+            # Sort by date descending
+            sorted_data = user_data.sort_values("waktu", ascending=False)
+            
+            for idx, complaint in sorted_data.iterrows():
+                # Status styling
+                status = complaint['status'].lower()
+                status_class = "status-selesai" if status == "selesai" else \
+                              "status-ditolak" if status == "ditolak" else \
+                              "status-pending" if status in ["pending", "menunggu"] else \
+                              "status-terkirim"
+                
+                # Create expandable section
+                with st.expander(f"{format_waktu(complaint['waktu'])} - {complaint['status']}", expanded=False):
+                    st.markdown('<div class="complaint-container">', unsafe_allow_html=True)
+                    
+                    # Complaint content
+                    st.markdown('<div class="complaint-content">', unsafe_allow_html=True)
+                    st.markdown('<div class="complaint-text">', unsafe_allow_html=True)
+                    st.markdown(complaint['isi_komplain'])
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Complaint photo
+                    if complaint['link_foto']:
+                        st.image(complaint['link_foto'], use_container_width=True)
+                    
+                    # Admin response (if exists)
+                    if complaint.get('tanggapan'):
+                        st.markdown('<div class="response-container">', unsafe_allow_html=True)
+                        st.markdown('<div class="response-label">Tanggapan Admin:</div>', unsafe_allow_html=True)
+                        st.markdown(complaint['tanggapan'])
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Delete button
+                    if st.button(f"Hapus Komplain", key=f"delete_{idx}"):
+                        ws.delete_rows(idx+2)
+                        st.success("Komplain berhasil dihapus!")
+                        st.rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-
+    with tab2:
+        with st.form(key='new_complaint_form', clear_on_submit=True):
+            st.subheader("Form Komplain Baru")
+            
+            complaint_text = st.text_area(
+                "Isi Komplain*",
+                placeholder="Jelaskan komplain Anda secara detail...",
+                height=150
+            )
+            
+            complaint_photo = st.file_uploader(
+                "Upload Foto Pendukung (Opsional)",
+                type=["jpg", "jpeg", "png"],
+                help="Upload foto jika diperlukan untuk memperjelas komplain"
+            )
+            
+            # Proper submit button
+            submitted = st.form_submit_button("Kirim Komplain")
+            
+            if submitted:
+                if not complaint_text:
+                    st.error("Harap isi komplain terlebih dahulu")
+                else:
+                    try:
+                        photo_url = upload_to_cloudinary(
+                            complaint_photo, 
+                            f"complaint_{USERNAME}_{datetime.now().timestamp()}"
+                        ) if complaint_photo else ""
+                        
+                        ws.append_row([
+                            USERNAME,
+                            complaint_text,
+                            photo_url,
+                            datetime.now().isoformat(),
+                            "Terkirim",
+                            ""  # Empty for admin response
+                        ])
+                        
+                        st.success("Komplain berhasil dikirim!")
+                        # Form will auto-clear because of clear_on_submit=True
+                    except Exception as e:
+                        st.error(f"Gagal mengirim komplain: {str(e)}")
+                        
 def show_profil():
     USERNAME = st.session_state.get("username", "")
     st.title("👤 Profil Saya")
-    sheet = connect_gsheet()
-    ws = sheet.worksheet("User")
-    data = pd.DataFrame(ws.get_all_records())
-    if data.empty:
-        data = pd.DataFrame(columns=["username", "nama_lengkap", "no_hp", "kamar", "deskripsi", "foto_profil", "status_pembayaran", "last_edit"])
-    idx = data.index[data['username'] == USERNAME].tolist()[0]
-    row = data.iloc[idx]
+    
+    # Custom CSS untuk halaman profil
+    st.markdown("""
+    <style>
+    .profile-card {
+        background: rgba(60,60,60,0.7);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        margin-bottom: 20px;
+    }
+    .profile-header {
+        color: #42A5F5;
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 10px;
+    }
+    .profile-detail {
+        margin-bottom: 10px;
+    }
+    .edit-form {
+        background: rgba(60,60,60,0.9);
+        padding: 20px;
+        border-radius: 12px;
+        margin-top: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    st.image(row['foto_profil'], width=150)
-    st.markdown(f"**Terakhir Edit:** {format_waktu(row['last_edit'])}")
-
-    edit_allowed = True
     try:
-        last = datetime.fromisoformat(row['last_edit'])
-        if datetime.now() - last < timedelta(days=7):
-            edit_allowed = False
-    except:
-        pass
+        # Load data user dari Google Sheets
+        user_ws = connect_gsheet().worksheet("User")
+        users = user_ws.get_all_records()
+        user_data = next((u for u in users if u['username'] == USERNAME), None)
+        
+        if not user_data:
+            st.error("Data pengguna tidak ditemukan")
+            return
 
-    with st.form("edit_profil"):
-        nama = st.text_input("Nama Lengkap", value=row['nama_lengkap'])
-        no_hp = st.text_input("No HP", value=row['no_hp'])
-        deskripsi = st.text_area("Deskripsi", value=row['deskripsi'])
-        foto = st.file_uploader("Ganti Foto Profil")
-        submit = st.form_submit_button("Simpan Perubahan")
-
-        if not edit_allowed:
-            st.warning("Profil hanya bisa diedit sekali setiap 7 hari.")
-            st.stop()
-
-        if submit:
-            url = upload_to_cloudinary(foto, f"foto_profil_{USERNAME}_{datetime.now().isoformat()}") if foto else row['foto_profil']
-            ws.update(f"D{idx+2}:G{idx+2}", [[nama, no_hp, deskripsi, url]])
-            ws.update_acell(f"I{idx+2}", datetime.now().isoformat())
-            st.success("Profil berhasil diperbarui!")
-            st.rerun()
+        # Tampilkan data profil
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.markdown("### Foto Profil")
+            if user_data.get('foto_profil'):
+                st.image(user_data['foto_profil'], width=150, caption="Foto Profil Saat Ini")
+            else:
+                st.image("https://via.placeholder.com/150", width=150, caption="Belum Ada Foto")
+            
+            # Statistik aktivitas
+            st.markdown("### Aktivitas Terakhir")
+            st.markdown(f"""
+            <div class="profile-detail">
+                <p><strong>Login Terakhir:</strong> {user_data.get('last_login', '-')}</p>
+                <p><strong>Edit Profil Terakhir:</strong> {format_waktu(user_data.get('last_edit', '-'))}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("### Informasi Profil")
+            st.markdown(f"""
+            <div class="profile-card">
+                <div class="profile-header">Data Pribadi</div>
+                <p class="profile-detail"><strong>Username:</strong> {user_data['username']}</p>
+                <p class="profile-detail"><strong>Nama Lengkap:</strong> {user_data.get('nama_lengkap', '-')}</p>
+                <p class="profile-detail"><strong>Nomor HP/Email:</strong> {user_data.get('no_hp', '-')}</p>
+                <p class="profile-detail"><strong>Kamar:</strong> {user_data.get('kamar', '-')}</p>
+                <p class="profile-detail"><strong>Status Pembayaran:</strong> {user_data.get('status_pembayaran', '-')}</p>
+                <p class="profile-detail"><strong>Deskripsi:</strong> {user_data.get('deskripsi', '-')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Tombol edit profil
+        if st.button("✏️ Edit Profil", key="edit_profile_btn"):
+            st.session_state.edit_profile = True
+        
+        # Form edit profil
+        if st.session_state.get('edit_profile'):
+            with st.form(key='edit_profile_form'):
+                st.markdown("### Edit Profil")
+                
+                # Cek apakah bisa edit (untuk non-admin, maksimal 1x seminggu)
+                can_edit = True
+                last_edit_str = user_data.get('last_edit', '')
+                if last_edit_str:
+                    try:
+                        last_edit = datetime.fromisoformat(last_edit_str)
+                        if datetime.now() - last_edit < timedelta(days=7):
+                            can_edit = False
+                            st.warning("Anda hanya bisa mengedit profil 1 kali dalam seminggu")
+                    except:
+                        pass
+                
+                if can_edit:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        nama = st.text_input("Nama Lengkap", value=user_data.get('nama_lengkap', ''))
+                        kontak = st.text_input("Nomor HP/Email", value=user_data.get('no_hp', ''))
+                        deskripsi = st.text_area("Deskripsi Diri", value=user_data.get('deskripsi', ''))
+                    
+                    with col2:
+                        foto = st.file_uploader("Upload Foto Profil Baru", type=["jpg", "jpeg", "png"])
+                        
+                        # Toggle password visibility
+                        st.markdown("### Ganti Password (Opsional)")
+                        show_password = st.checkbox("Tampilkan Password", key="show_pass")
+                        password_type = "text" if show_password else "password"
+                        new_password = st.text_input("Password Baru", type=password_type)
+                        confirm_password = st.text_input("Konfirmasi Password", type=password_type)
+                        
+                        if new_password and new_password != confirm_password:
+                            st.error("Password tidak cocok!")
+                    
+                    # Tombol aksi
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.form_submit_button("💾 Simpan Perubahan"):
+                            # Validasi password
+                            if new_password and new_password != confirm_password:
+                                st.error("Password tidak cocok!")
+                            else:
+                                # Upload foto baru jika ada
+                                link_foto = upload_to_cloudinary(foto, f"profil_{USERNAME}") if foto else user_data.get('foto_profil', '')
+                                
+                                # Update data di Google Sheets
+                                all_users = user_ws.get_all_values()
+                                row_num = next((i+1 for i, row in enumerate(all_users) if row[0] == USERNAME), None)
+                                
+                                if row_num:
+                                    updates = {
+                                        4: nama,  # nama_lengkap
+                                        5: f"'{kontak}",  # no_hp (ditambahkan ' untuk format nomor)
+                                        6: user_data.get('kamar', ''),  # kamar
+                                        7: deskripsi,  # deskripsi
+                                        8: link_foto,  # foto_profil
+                                        9: datetime.now().isoformat()  # last_edit
+                                    }
+                                    
+                                    for col, value in updates.items():
+                                        user_ws.update_cell(row_num, col, value)
+                                    
+                                    # Update password jika diisi
+                                    if new_password:
+                                        hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                                        user_ws.update_cell(row_num, 2, hashed)  # password_hash
+                                    
+                                    st.success("Profil berhasil diperbarui!")
+                                    st.session_state.edit_profile = False
+                                    st.rerun()
+                    
+                    with col2:
+                        if st.form_submit_button("❌ Batal"):
+                            st.session_state.edit_profile = False
+                            st.rerun()
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memuat profil: {str(e)}")
 
 # --- Entry Point untuk Streamlit App ---
 if __name__ == "__main__":
