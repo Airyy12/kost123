@@ -192,13 +192,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Fungsi Utility (asumsi sudah ada dan berfungsi) ---
-# from sheets import connect_gsheet, load_sheet_data
-# from cloudinary_upload import upload_to_cloudinary
-# from datetime import datetime, timedelta
-# import bcrypt
-# import requests
-
 # --- Fungsi Utama untuk Penyewa ---
 def run_penyewa(menu):
     if menu == "Beranda":
@@ -217,115 +210,91 @@ def run_penyewa(menu):
         st.rerun()
 
 # --- Dashboard ---
-def show_dashboard():
-    # Header modern
-    st.markdown(f"""
-    <div class='page-header'>
-        <h1>👋 Selamat datang, {st.session_state.get("nama", "Penyewa")}!</h1>
-        <p>Dashboard Informasi Kamar dan Pembayaran</p>
-    </div>
-    """, unsafe_allow_html=True)
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+from sheets import load_sheet_data
+from cloudinary_upload import upload_to_cloudinary
 
-    # Muat semua data yang dibutuhkan
+def show_dashboard():
+    st.markdown("<h2 style='text-align:center;'>📊 Dashboard Penyewa Kost</h2>", unsafe_allow_html=True)
+    username = st.session_state.get("username")
+
     user_df = load_sheet_data("User")
     kamar_df = load_sheet_data("Kamar")
-    pembayaran_df = load_sheet_data("Pembayaran")
     komplain_df = load_sheet_data("Komplain")
+    pembayaran_df = load_sheet_data("Pembayaran")
 
-    # Ambil data penyewa saat ini
-    username = st.session_state.get("username", "")
-    
-    # Pastikan data user ada sebelum mencoba mengaksesnya
-    if username not in user_df['username'].values:
-        st.error("Data pengguna tidak ditemukan. Silakan login ulang.")
-        return
+    # Data user login
+    user_data = user_df[user_df["username"] == username].iloc[0]
 
-    data_user = user_df[user_df['username'] == username].iloc[0]
-    
-    # Periksa apakah kamar pengguna ada di data kamar
-    if data_user['kamar'] not in kamar_df['Nama'].values:
-        st.warning(f"Informasi kamar '{data_user['kamar']}' tidak ditemukan. Harap hubungi admin.")
-        data_kamar = pd.Series({'Nama': data_user['kamar'], 'Status': 'Tidak Diketahui', 'Harga': 0, 'Deskripsi': 'Tidak ada informasi', 'link_foto': 'https://via.placeholder.com/150?text=No+Room+Image'})
-    else:
-        data_kamar = kamar_df[kamar_df['Nama'] == data_user['kamar']].iloc[0]
-
-    data_pembayaran = pembayaran_df[pembayaran_df['username'] == username]
-    pembayaran_terakhir = data_pembayaran.sort_values("waktu", ascending=False).head(1).to_dict("records")
-    data_komplain = komplain_df[komplain_df['username'] == username]
-    riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(5)
-
-    # Layout menggunakan columns dan cards
-    # Bagian atas: Profil dan Info Kamar
+    # Grid layout 2x2
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("<div class='card'><div class='card-title'>👤 Profil Penyewa</div>", unsafe_allow_html=True)
-        # Menampilkan foto profil dengan ukuran yang konsisten
-        st.image(data_user['foto_profil'] if pd.notna(data_user['foto_profil']) and data_user['foto_profil'] else 'https://via.placeholder.com/150?text=No+Photo', width=150)
-        st.markdown(f"""
-        <div style='margin-top: 15px;'>
-            <p><b>Nama:</b> {data_user['nama_lengkap']}</p>
-            <p><b>No HP:</b> {data_user['no_hp']}</p>
-            <p><b>Kamar:</b> {data_user['kamar']}</p>
-            <p><b>Status Pembayaran:</b> <span class='status-{data_user['status_pembayaran'].lower().replace(" ", "-")}'>{data_user['status_pembayaran']}</span></p>
-            <p><b>Terakhir Diubah:</b> {data_user['last_edit']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container():
+            st.subheader("👤 Profil Penyewa")
+            st.image(user_data["foto_profil"], width=100)
+            st.write(f"**Nama:** {user_data['nama_lengkap']}")
+            st.write(f"**No HP:** {user_data['no_hp']}")
+            st.write(f"**Kamar:** {user_data['kamar']}")
+            st.write(f"**Deskripsi:** {user_data['deskripsi']}")
+            st.caption(f"🕒 Terakhir edit: {user_data['last_edit']}")
 
     with col2:
-        st.markdown("<div class='card'><div class='card-title'>🛏️ Info Kamar</div>", unsafe_allow_html=True)
-        # Menampilkan foto kamar dengan ukuran yang konsisten
-        st.image(data_kamar['link_foto'] if pd.notna(data_kamar['link_foto']) and data_kamar['link_foto'] else 'https://via.placeholder.com/150?text=No+Room+Image', width=150)
-        st.markdown(f"""
-        <div style='margin-top: 15px;'>
-            <p><b>Nama Kamar:</b> {data_kamar['Nama']}</p>
-            <p><b>Status:</b> {data_kamar['Status']}</p>
-            <p><b>Harga:</b> Rp{data_kamar['Harga']:,}/bulan</p>
-            <p><b>Fasilitas:</b> {data_kamar['Deskripsi']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # Bagian bawah: Riwayat Komplain dan Pembayaran Terakhir
-    st.markdown("---") # Garis pemisah
-    st.markdown("<h2 style='color: #2c3e50; text-align: center; margin-bottom: 30px;'>Aktivitas Terbaru</h2>", unsafe_allow_html=True)
+        with st.container():
+            st.subheader("🛏️ Info Kamar")
+            kamar_user = kamar_df[kamar_df["Nama"] == user_data["kamar"]]
+            if not kamar_user.empty:
+                kamar_info = kamar_user.iloc[0]
+                st.image(kamar_info["link_foto"], width=120)
+                st.write(f"**Harga:** Rp{int(kamar_info['Harga']):,}")
+                st.write(f"**Status:** {kamar_info['Status']}")
+                st.write(f"**Deskripsi:** {kamar_info['Deskripsi']}")
+            else:
+                st.warning("Data kamar tidak ditemukan.")
 
     col3, col4 = st.columns(2)
 
     with col3:
-        st.markdown("<div class='card'><div class='card-title'>💬 Riwayat Komplain Terakhir</div>", unsafe_allow_html=True)
-        if riwayat_komplain.empty:
-            st.markdown("<div class='info-box'>Belum ada komplain</div>", unsafe_allow_html=True)
-        else:
-            for _, row in riwayat_komplain.iterrows():
-                status_class = "status-" + row['status'].lower().replace(" ", "-")
-                st.markdown(f"""
-                <div style='margin-bottom: 15px; padding: 12px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;'>
-                    <p style='font-size: 0.9em; color: #7f8c8d;'>{row['waktu']}</p>
-                    <p><b>Status:</b> <span class='{status_class}'>{row['status']}</span></p>
-                    <p>{row['isi_komplain'][:100]}...</p> {/* Preview komplain */}
-                </div>
-                """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container():
+            st.subheader("💬 Riwayat Komplain")
+            if "username" in komplain_df.columns:
+                komplain_user = komplain_df[komplain_df["username"] == username]
+                if not komplain_user.empty:
+                    st.dataframe(komplain_user[["isi_komplain", "status", "waktu"]].sort_values(by="waktu", ascending=False))
+                else:
+                    st.info("Belum ada komplain.")
+            else:
+                st.info("Kolom 'username' belum tersedia di sheet Komplain.")
 
     with col4:
-        st.markdown("<div class='card'><div class='card-title'>💳 Pembayaran Terakhir</div>", unsafe_allow_html=True)
-        if pembayaran_terakhir:
-            p = pembayaran_terakhir[0]
-            status_class = "status-" + p['status'].lower().replace(" ", "-")
-            st.image(p["bukti"] if pd.notna(p["bukti"]) and p["bukti"] else 'https://via.placeholder.com/150?text=No+Receipt', width=150)
-            st.markdown(f"""
-            <div style='margin-top: 15px;'>
-                <p><b>Periode:</b> {p['bulan']} {p['tahun']}</p>
-                <p><b>Nominal:</b> Rp{p['nominal']:,}</p>
-                <p><b>Status:</b> <span class='{status_class}'>{p['status']}</span></p>
-                <p><b>Waktu Upload:</b> {p['waktu']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("<div class='warning-box'>Belum ada pembayaran tercatat</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container():
+            st.subheader("💳 Pembayaran Terakhir")
+            if "username" in pembayaran_df.columns:
+                bayar_user = pembayaran_df[pembayaran_df["username"] == username]
+                if not bayar_user.empty:
+                    bayar_terakhir = bayar_user.sort_values(by="waktu", ascending=False).iloc[0]
+                    st.write(f"**Bulan:** {bayar_terakhir['bulan']} {bayar_terakhir['tahun']}")
+                    st.write(f"**Nominal:** Rp{int(bayar_terakhir['nominal']):,}")
+                    st.write(f"**Status:** {bayar_terakhir['status']}")
+                    st.image(bayar_terakhir["bukti"], width=150)
+                else:
+                    st.info("Belum ada data pembayaran.")
+            else:
+                st.info("Kolom 'username' belum tersedia di sheet Pembayaran.")
+
+def run_penyewa(menu):
+    if menu == "Dashboard":
+        show_dashboard()
+    elif menu == "Pembayaran":
+        st.write("💳 Halaman Pembayaran (dalam pengembangan)")
+    elif menu == "Komplain":
+        st.write("💬 Halaman Komplain (dalam pengembangan)")
+    elif menu == "Profil":
+        st.write("👤 Halaman Profil (dalam pengembangan)")
+    else:
+        st.error("Menu tidak dikenal.")
 
 
 # --- Pembayaran ---
