@@ -45,9 +45,12 @@ def show_dashboard():
     data_pembayaran = pembayaran_df[pembayaran_df['username'] == username]
     pembayaran_terakhir = data_pembayaran.sort_values("waktu", ascending=False).head(1).to_dict("records")
 
-    # Ambil komplain terakhir
-    data_komplain = komplain_df[komplain_df['username'] == username]
-    riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(5)
+    # Penanganan khusus jika kolom "username" tidak berisi nilai
+    if "username" in komplain_df.columns and komplain_df["username"].notna().any():
+        data_komplain = komplain_df[komplain_df['username'] == username]
+        riwayat_komplain = data_komplain.sort_values("waktu", ascending=False).head(5)
+    else:
+        riwayat_komplain = pd.DataFrame()
 
     # ────────────────────────────────────────────────
     # Layout: 2x2 Grid
@@ -98,6 +101,7 @@ def show_dashboard():
                 st.info("Belum ada pembayaran tercatat.")
 
     st.markdown("---")
+
 
 
 def show_pembayaran():
