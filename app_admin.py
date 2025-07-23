@@ -11,6 +11,8 @@ def run_admin(menu):
         admin_dashboard()
     elif menu == "Kelola Kamar":
         kelola_kamar()
+    elif menu == "Kelola Pembayaran":
+        kelola_pembayaran()
     elif menu == "Manajemen":
         manajemen()
     elif menu == "Verifikasi Booking":
@@ -316,6 +318,147 @@ def kelola_kamar():
                     kamar_ws.append_row([nama, "Kosong", harga, deskripsi, link])
                     st.success("Kamar berhasil ditambahkan!")
                     st.rerun()
+
+def kelola_pembayaran():
+    st.title("💳 Kelola Metode Pembayaran")
+
+    try:
+        # Hubungkan ke Google Sheets
+        sheet = connect_gsheet()
+        ws = sheet.worksheet("PaymentInfo")
+
+        # Ambil semua data dari sheet
+        values = ws.get_all_values()
+
+        # Jika kosong, buat DataFrame kosong
+        if not values or len(values) < 2:
+            payment_df = pd.DataFrame(columns=["payment_type", "bank_name", "account_name", "account_no", "qris_image"])
+        else:
+            # Ambil hanya 5 kolom pertama dari setiap baris (A–E)
+            trimmed_values = [row[:5] for row in values[1:]]  # Skip baris header
+            columns = ["payment_type", "bank_name", "account_name", "account_no", "qris_image"]
+            payment_df = pd.DataFrame(trimmed_values, columns=columns)
+
+        # Tab untuk Bank/EWallet dan QRIS
+        tab_bank, tab_qris = st.tabs(["🏦 Bank/EWallet", "📱 QRIS"])
+
+        with tab_bank:
+            st.subheader("Kelola Rekening Bank/EWallet")
+
+            with st.form(key='form_bank'):
+                col1, col2 = st.columns(2)
+                with col1:
+                    jenis_pembayaran = st.selectbox(
+                        "Jenis Pembayaran*",
+                        ["Bank Transfer", "E-Wallet"],
+                        key="jenis_bank"
+                    )
+                    nama_bank = st.text_input("Nama Bank/EWallet*")
+                with col2:
+                    atas_nama = st.text_input("Atas Nama*")
+                    nomor_rekening = st.text_input("Nomor Rekening*")
+
+                submitted = st.form_submit_button("💾 Simpan Rekening")
+                if submitted:
+                    if not all([nama_bank, atas_nama, nomor_rekening]):
+                        st.error("Harap isi semua field wajib!")
+                    else:
+                        ws.append_row([
+                            jenis_pembayaran,
+                            nama_bank,
+                            atas_nama,
+                            nomor_rekening,
+                            ""  # QRIS dikosongkan
+                        ])
+                        st.success("Data rekening berhasil disimpan!")
+                        st.rerun()
+
+            # Filter data bank/ewallet
+            bank_data = payment_df[
+                payment_df['payment_type'].isin(['Bank Transfer', 'E-Wallet']) &
+                payment_df['account_no'].notna() &
+                payment_df['account_no'].str.strip().ne('')
+            ]
+
+            st.subheader("Daftar Rekening Tersedia")
+            if bank_data.empty:
+                st.info("Belum ada data rekening bank/ewallet")
+            else:
+                for idx, row in bank_data.iterrows():
+                    cols = st.columns([4, 1])
+                    with cols[0]:
+                        st.markdown(f"""
+                        <div class="info-card">
+                            <p><strong>{row['bank_name']}</strong> ({row['payment_type']})</p>
+                            <p>👤 Atas Nama: <code>{row['account_name']}</code></p>
+                            <p>🔢 Nomor: <code>{row['account_no']}</code></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with cols[1]:
+                        if st.button("🗑️", key=f"hapus_bank_{idx}"):
+                            ws.delete_rows(idx + 2)  # Baris +2 karena header di baris 1
+                            st.success("Rekening berhasil dihapus!")
+                            st.rerun()
+                    st.markdown("---")
+
+        with tab_qris:
+            st.subheader("Kelola QRIS Pembayaran")
+
+            qris_data = payment_df[
+                (payment_df['payment_type'] == 'QRIS') &
+                payment_df['qris_image'].notna() &
+                payment_df['qris_image'].str.strip().ne('')
+            ]
+
+            if not qris_data.empty:
+                st.image(qris_data.iloc[0]['qris_image'], width=250, caption="QRIS Terdaftar")
+
+                if st.button("🗑️ Hapus QRIS", type="primary"):
+                    rows_to_delete = qris_data.index + 2
+                    for row in sorted(rows_to_delete, reverse=True):
+                        ws.delete_rows(row)
+                    st.success("QRIS berhasil dihapus!")
+                    st.rerun()
+            else:
+                with st.form(key='form_qris'):
+                    file_qris = st.file_uploader(
+                        "Upload Gambar QRIS*",
+                        type=["jpg", "jpeg", "png"],
+                        help="Format JPG/PNG, ukuran maksimal 2MB"
+                    )
+
+                    submitted = st.form_submit_button("Upload QRIS")
+                    if submitted:
+                        if not file_qris:
+                            st.error("Harap pilih file QRIS!")
+                        else:
+                            try:
+                                # Upload ke Cloudinary
+                                url_gambar = upload_to_cloudinary(
+                                    file_qris,
+                                    f"qris_payment_{int(datetime.now().timestamp())}"
+                                )
+
+                                # Hapus QRIS lama jika ada
+                                if not qris_data.empty:
+                                    rows_to_delete = qris_data.index + 2
+                                    for row in sorted(rows_to_delete, reverse=True):
+                                        ws.delete_rows(row)
+
+                                # Tambah QRIS baru
+                                ws.append_row([
+                                    "QRIS",
+                                    "", "", "",
+                                    url_gambar
+                                ])
+
+                                st.success("QRIS berhasil diupdate!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Gagal mengupload QRIS: {str(e)}")
+
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {str(e)}")
 
 def manajemen():
     st.title("📁 Manajemen Sistem")
