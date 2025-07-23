@@ -37,6 +37,7 @@ def sidebar_menu():
             menu_options = [
                 ("Dashboard Admin", "📊 Dashboard Admin"),
                 ("Kelola Kamar", "🛠️ Kelola Kamar"),
+                ("Kelola Pembayaran", "💳 Kelola Pembayaran"),
                 ("Manajemen", "🗂️ Manajemen"),
                 ("Verifikasi Booking", "✅ Verifikasi Booking"),
                 ("Profil Saya", "👤 Profil Saya"),
