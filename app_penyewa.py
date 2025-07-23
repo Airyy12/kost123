@@ -232,31 +232,11 @@ def show_dashboard():
 
     st.markdown("---")
 
-# Tambahkan fungsi utilitas untuk badge status
-def get_status_class(status):
-    status = str(status).lower()
-    if status == "lunas":
-        return "status-lunas"
-    elif "belum" in status or "pending" in status or "menunggu" in status:
-        return "status-belum"
-    elif status == "ditolak":
-        return "status-ditolak"
-    else:
-        return "status-default"
-
 def show_pembayaran():
     USERNAME = st.session_state.get("username", "")
     st.title("💸 Pembayaran")
 
-    # Load data
-    sheet = connect_gsheet()
-    ws = sheet.worksheet("Pembayaran")
-    data = pd.DataFrame(ws.get_all_records())
-    if data.empty:
-        data = pd.DataFrame(columns=["username", "bukti", "bulan", "tahun", "waktu", "nominal", "status"])
-    user_data = data[data['username'] == USERNAME]
-
-    # Custom CSS
+    # CSS untuk tampilan
     st.markdown("""
     <style>
     .payment-container {
@@ -266,18 +246,12 @@ def show_pembayaran():
         background: rgba(30, 30, 30, 0.7);
         border-left: 4px solid #42A5F5;
     }
-    .payment-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        cursor: pointer;
-        padding: 0.5rem 0;
-    }
-    .payment-title {
-        font-size: 1rem;
-        font-weight: bold;
-        color: #42A5F5;
-        margin: 0;
+    .info-card {
+        background: rgba(60,60,60,0.7);
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        border-left: 5px solid #42A5F5;
     }
     .payment-status {
         padding: 0.25rem 0.75rem;
@@ -288,147 +262,161 @@ def show_pembayaran():
     .status-lunas { background: #4CAF50; color: white; }
     .status-pending { background: #FF9800; color: black; }
     .status-ditolak { background: #F44336; color: white; }
-    .payment-content {
-        padding: 1rem 0;
-        border-top: 1px solid #444;
-        margin-top: 0.5rem;
-    }
-    .payment-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        margin-bottom: 1rem;
-    }
-    .payment-label {
-        font-size: 0.85rem;
-        color: #9E9E9E;
-        margin-bottom: 0.25rem;
-    }
-    .payment-value {
-        font-size: 1rem;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-    # Tab navigation
-    tab1, tab2 = st.tabs(["📋 Riwayat Pembayaran", "💳 Upload Pembayaran"])
+    # Membuat 3 tab
+    tab1, tab2, tab3 = st.tabs(["Informasi Pembayaran", "📋 Riwayat Pembayaran", "💳 Upload Pembayaran"])
 
     with tab1:
-        if user_data.empty:
-            st.info("Belum ada riwayat pembayaran")
-        else:
-            # Sort by date descending
-            sorted_data = user_data.sort_values(["tahun", "bulan"], ascending=[False, False])
-            
-            for idx, payment in sorted_data.iterrows():
-                # Status styling
-                status = payment['status'].lower()
-                status_class = "status-lunas" if status == "lunas" else \
-                             "status-ditolak" if status in ["ditolak", "rejected"] else \
-                             "status-pending"
+        st.subheader("🔍 Informasi Pembayaran")
+        try:
+            payment_info = load_sheet_data("PaymentInfo")
+            if payment_info.empty:
+                st.warning("Belum ada informasi pembayaran")
+            else:
+                # Tampilkan bank/ewallet
+                bank_methods = payment_info[
+                    (payment_info['payment_type'].isin(['Bank Transfer', 'E-Wallet'])) & 
+                    (payment_info['account_no'].notna())
+                ]
                 
-                # Create expandable section
-                with st.expander(f"{payment['bulan']} {payment['tahun']}", expanded=False):
-                    st.markdown('<div class="payment-container">', unsafe_allow_html=True)
+                if not bank_methods.empty:
+                    st.markdown("### 💳 Transfer Bank/EWallet")
+                    for _, method in bank_methods.iterrows():
+                        st.markdown(f"""
+                        <div class="info-card">
+                            <p><strong>{method['bank_name']}</strong></p>
+                            <p>👤 Atas Nama: <code>{method['account_name']}</code></p>
+                            <p>🔢 Nomor: <code>{method['account_no']}</code></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Tampilkan QRIS
+                qris_method = payment_info[
+                    (payment_info['payment_type'] == 'QRIS') & 
+                    (payment_info['qris_image'].notna())
+                ]
+                if not qris_method.empty:
+                    st.markdown("### 📱 QR Code (Scan untuk Bayar)")
+                    st.image(qris_method.iloc[0]['qris_image'], width=250)
                     
-                    # Header with status
-                    st.markdown(
-                        f'<div class="payment-header">'
-                        f'<div class="payment-status {status_class}">{payment["status"]}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                    
-                    # Payment details
-                    st.markdown('<div class="payment-content">', unsafe_allow_html=True)
-                    st.markdown('<div class="payment-grid">', unsafe_allow_html=True)
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown('<div class="payment-label">Nominal</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="payment-value">Rp {int(payment["nominal"]):,}</div>', unsafe_allow_html=True)
-                    
-                    with col2:
-                        st.markdown('<div class="payment-label">Tanggal Upload</div>', unsafe_allow_html=True)
-                        st.markdown(f'<div class="payment-value">{format_waktu(payment["waktu"])}</div>', unsafe_allow_html=True)
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Payment proof
-                    if payment['bukti']:
-                        st.image(payment['bukti'], use_container_width=True)
-                    else:
-                        st.markdown("_Tidak ada bukti pembayaran_")
-                    
-                    # Delete button
-                    if st.button(f"Hapus Pembayaran", key=f"delete_{idx}"):
-                        ws.delete_rows(idx+2)
-                        st.success("Pembayaran berhasil dihapus!")
-                        st.rerun()
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Gagal memuat info pembayaran: {e}")
 
     with tab2:
-        # Initialize form
-        with st.form(key='payment_form', clear_on_submit=True):
-            st.subheader("Form Pembayaran")
+        st.subheader("📋 Riwayat Pembayaran Saya")
+        try:
+            pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
+            data_pembayaran = pembayaran_ws.get_all_records()
+            pembayaran_user = [p for p in data_pembayaran if p['username'] == USERNAME]
             
+            if not pembayaran_user:
+                st.info("Anda belum memiliki riwayat pembayaran")
+            else:
+                # Urutkan dari yang terbaru
+                pembayaran_user.sort(key=lambda x: x['waktu'], reverse=True)
+                
+                for pembayaran in pembayaran_user:
+                    # Warna status
+                    warna_status = {
+                        "Lunas": "🟢",
+                        "Menunggu Verifikasi": "🟡", 
+                        "Ditolak": "🔴"
+                    }.get(pembayaran['status'], "⚪")
+                    
+                    with st.expander(
+                        f"{warna_status} {pembayaran['bulan']} {pembayaran['tahun']} - Rp{int(pembayaran['nominal']):,}",
+                        expanded=False
+                    ):
+                        st.markdown(f"""
+                        <div class="payment-container">
+                            <div class="payment-status status-{pembayaran['status'].lower()}">
+                                {pembayaran['status']}
+                            </div>
+                            <div style="margin-top: 15px;">
+                                <p><strong>Nominal:</strong> Rp {int(pembayaran['nominal']):,}</p>
+                                <p><strong>Tanggal Upload:</strong> {format_waktu(pembayaran['waktu'])}</p>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if pembayaran.get('bukti'):
+                            st.image(pembayaran['bukti'], caption="Bukti Pembayaran", use_container_width=True)
+                        
+                        if st.button("🗑️ Hapus", key=f"delete_{pembayaran['waktu']}"):
+                            # Hapus data dari Google Sheets
+                            semua_data = pembayaran_ws.get_all_values()
+                            baris = next(
+                                (i+1 for i, row in enumerate(semua_data) 
+                                if row[0] == USERNAME and row[2] == pembayaran['bulan'] and row[3] == str(pembayaran['tahun'])),
+                                None
+                            )
+                            if baris:
+                                pembayaran_ws.delete_rows(baris)
+                                st.success("Pembayaran berhasil dihapus!")
+                                st.rerun()
+        except Exception as e:
+            st.error(f"Gagal memuat riwayat pembayaran: {e}")
+
+    with tab3:
+        st.subheader("💳 Upload Bukti Pembayaran Baru")
+        with st.form(key='form_pembayaran', clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
                 bulan = st.selectbox(
-                    "Bulan",
+                    "Bulan*",
                     ["Januari", "Februari", "Maret", "April", "Mei", "Juni", 
                      "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
                     index=datetime.now().month-1
                 )
             with col2:
                 tahun = st.selectbox(
-                    "Tahun",
+                    "Tahun*",
                     [datetime.now().year-1, datetime.now().year, datetime.now().year+1],
                     index=1
                 )
             
             nominal = st.number_input(
-                "Nominal Pembayaran (Rp)",
+                "Nominal Pembayaran (Rp)*",
                 min_value=100000,
                 value=1500000,
                 step=50000
             )
             
             bukti = st.file_uploader(
-                "Upload Bukti Pembayaran",
+                "Upload Bukti Pembayaran*",
                 type=["jpg", "jpeg", "png"],
-                help="Upload bukti transfer atau pembayaran"
+                help="Upload foto struk transfer/screenshot bukti pembayaran"
             )
             
-            # Proper submit button
-            submitted = st.form_submit_button("Kirim Pembayaran")
-            
-            if submitted:
-                if not bukti:
-                    st.error("Harap upload bukti pembayaran")
+            if st.form_submit_button("Kirim Pembayaran"):
+                if not all([bulan, tahun, nominal, bukti]):
+                    st.error("Harap lengkapi semua data yang wajib diisi!")
                 else:
                     try:
-                        image_url = upload_to_cloudinary(
+                        # Upload gambar ke Cloudinary
+                        url_gambar = upload_to_cloudinary(
                             bukti, 
-                            f"payment_{USERNAME}_{bulan}_{tahun}_{datetime.now().timestamp()}"
+                            f"payment_{USERNAME}_{bulan}_{tahun}_{int(datetime.now().timestamp())}"
                         )
                         
-                        ws.append_row([
+                        # Simpan ke Google Sheets
+                        pembayaran_ws = connect_gsheet().worksheet("Pembayaran")
+                        pembayaran_ws.append_row([
                             USERNAME,
-                            image_url,
+                            url_gambar,
                             bulan,
                             tahun,
-                            datetime.now().isoformat(),
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             nominal,
                             "Menunggu Verifikasi"
                         ])
                         
                         st.success("Bukti pembayaran berhasil dikirim!")
-                        # Form will auto-clear because of clear_on_submit=True
+                        st.rerun()
                     except Exception as e:
-                        st.error(f"Gagal mengupload: {str(e)}")
+                        st.error(f"Terjadi kesalahan: {str(e)}")
 
 def show_komplain():
     USERNAME = st.session_state.get("username", "")
@@ -589,7 +577,7 @@ def show_komplain():
                         # Form will auto-clear because of clear_on_submit=True
                     except Exception as e:
                         st.error(f"Gagal mengirim komplain: {str(e)}")
-                        
+
 def show_profil():
     USERNAME = st.session_state.get("username", "")
     st.title("👤 Profil Saya")
@@ -817,4 +805,3 @@ if __name__ == "__main__":
 
     # Jalankan fitur sesuai menu
     run_penyewa(menu)
- 
